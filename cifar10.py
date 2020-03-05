@@ -9,8 +9,8 @@ import numpy as np
 import tensorflow as tf
 import keras
 
-from bc_utils.init_tensor import init_filters
-from bc_utils.init_tensor import init_matrix
+from bc_utils.init_tensor import *
+from layers import *
 
 ####################################
 
@@ -30,47 +30,32 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 epochs = 10
 batch_size = 50
+
 x = tf.placeholder(tf.float32, [None, 32 , 32 , 3])
 y = tf.placeholder(tf.float32, [None, 10])
+scale = tf.placeholder(tf.float32, [8])
 
 ####################################
 
-def block(x, f1, f2, p, name):
-    f = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32, name=name+'_conv')
-    qf = tf.quantization.quantize_and_dequantize(input=f, input_min=-127, input_max=127, signed_input=True, num_bits=8)
-    
-    conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME')
-    relu = tf.nn.relu(conv)
-    pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
+m = model(layers=[
+conv_block(3,   32, 2),
+conv_block(32,  64, 2),
+conv_block(64, 128, 2),
+avg_pool(4, 4),
+dense_block(128, 10)
+])
 
-    qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=-127, input_max=127, signed_input=True, num_bits=8)
-    return qpool
-
-def dense(x, size, name):    
-    w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32, name=name)
-    qw = tf.quantization.quantize_and_dequantize(input=w, input_min=-127, input_max=127, signed_input=True, num_bits=8)
-    
-    fc = tf.matmul(x, qw)
-    
-    qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=-127, input_max=127, signed_input=True, num_bits=8)
-    return qfc
+model_train = m.train(x=x)
+model_collect = m.collect(x=x)
+model_predict = m.predict(x=x, scale=scale)
 
 ####################################
 
-block1 = block(x,       3, 32,  2, 'block1') # 32 -> 16
-block2 = block(block1, 32, 64,  2, 'block2') # 16 -> 8
-block3 = block(block2, 64, 128, 2, 'block3') #  8 -> 4
-pool   = tf.nn.avg_pool(block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME')  # 4 -> 1
-flat   = tf.reshape(pool, [batch_size, 128])
-out    = dense(flat, [128, 10], 'fc1')
-
-####################################
-
-predict = tf.argmax(out, axis=1)
+predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
-loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=out)
+loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train)
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
@@ -93,8 +78,8 @@ for ii in range(epochs):
         ys = y_train[s:e]
         sess.run([train], feed_dict={x: xs, y: ys})
         
+    '''
     total_correct = 0
-
     for jj in range(0, 10000, batch_size):
         s = jj
         e = jj + batch_size
@@ -104,7 +89,7 @@ for ii in range(epochs):
         total_correct += _sum_correct
   
     print ("acc: " + str(total_correct * 1.0 / 10000))
-        
+    '''
         
 ####################################
 
