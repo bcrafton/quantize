@@ -43,14 +43,17 @@ def block(x, f1, f2, p, name):
     relu = tf.nn.relu(conv)
     pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
 
-    return pool
+    qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=-127, input_max=127, signed_input=True, num_bits=8)
+    return qpool
 
 def dense(x, size, name):    
     w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32, name=name)
     qw = tf.quantization.quantize_and_dequantize(input=w, input_min=-127, input_max=127, signed_input=True, num_bits=8)
     
-    fc = tf.matmul(x, tf.quantization.quantize_and_dequantize(qw, input_min=-127, input_max=127, signed_input=True, num_bits=8))
-    return fc
+    fc = tf.matmul(x, qw)
+    
+    qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=-127, input_max=127, signed_input=True, num_bits=8)
+    return qfc
 
 ####################################
 
