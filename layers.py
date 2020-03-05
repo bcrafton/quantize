@@ -9,9 +9,23 @@ from bc_utils.init_tensor import init_matrix
 
 #############
 
+def quantize(x, low, high):
+    scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+    x = x / scale
+    x = tf.floor(x)
+    x = tf.clip_by_value(x, low, high)
+    return x, scale
+    
+def quantize_predict(x, scale, low, high):
+    x = x / scale
+    x = tf.floor(x)
+    x = tf.clip_by_value(x, low, high)
+    return x
+
+#############
+
 class model:
     def __init__(self, layers):
-        self.num_layers = len(layers)
         self.layers = layers
         
     def train(self, x):
@@ -21,15 +35,17 @@ class model:
         return y
     
     def collect(self, x):
-        y = x
+        scale = []
+        y = x 
         for layer in self.layers:
-            y = layer.collect(y)
-        return y
+            y, s = layer.collect(y)
+            scale.append(s)
+        return scale
 
     def predict(self, x, scale):
         y = x
-        for layer in self.layers:
-            y = layer.predict(y, scale)
+        for l in range(len(self.layers)):
+            y = self.layers[l].predict(y, scale[l])
         return y
         
 #############
@@ -65,10 +81,20 @@ class conv_block(layer):
         return qpool
     
     def collect(self, x):
-        return self.train(x)
+        qf, sf = quantize(self.f, -128, 127)
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME')
+        relu = tf.nn.relu(conv)
+        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+        qpool, spool = quantize(pool, -128, 127)
+        return qpool, spool
 
     def predict(self, x, scale):
-        return self.train(x)
+        qf, sf = quantize(self.f, -128, 127)
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME')
+        relu = tf.nn.relu(conv)
+        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+        qpool = quantize_predict(pool, scale, -128, 127)
+        return qpool
         
 #############
 
@@ -86,10 +112,18 @@ class dense_block(layer):
         return qfc
     
     def collect(self, x):
-        return self.train(x)
+        x = tf.reshape(x, (-1, self.isize))
+        qw, sw = quantize(self.w, -128, 127)
+        fc = tf.matmul(x, qw)
+        qfc, sfc = quantize(fc, -128, 127)
+        return qfc, sfc
 
     def predict(self, x, scale):
-        return self.train(x)
+        x = tf.reshape(x, (-1, self.isize))
+        qw, sw = quantize(self.w, -128, 127)
+        fc = tf.matmul(x, qw)
+        qfc = quantize_predict(fc, scale, -128, 127)
+        return qfc
 
 #############
 
@@ -99,13 +133,19 @@ class avg_pool(layer):
         self.p = p
         
     def train(self, x):        
-        return tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        return qpool
     
     def collect(self, x):
-        return tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool, spool = quantize(pool, -128, 127)
+        return qpool, spool
 
     def predict(self, x, scale):
-        return tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool = quantize_predict(pool, scale, -128, 127)
+        return qpool
 
 #############
 

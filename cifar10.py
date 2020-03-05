@@ -33,7 +33,7 @@ batch_size = 50
 
 x = tf.placeholder(tf.float32, [None, 32 , 32 , 3])
 y = tf.placeholder(tf.float32, [None, 10])
-scale = tf.placeholder(tf.float32, [8])
+scale = tf.placeholder(tf.float32, [5])
 
 ####################################
 
@@ -78,18 +78,31 @@ for ii in range(epochs):
         ys = y_train[s:e]
         sess.run([train], feed_dict={x: xs, y: ys})
         
-    '''
-    total_correct = 0
-    for jj in range(0, 10000, batch_size):
-        s = jj
-        e = jj + batch_size
-        xs = x_test[s:e]
-        ys = y_test[s:e]
-        _sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys})
-        total_correct += _sum_correct
-  
-    print ("acc: " + str(total_correct * 1.0 / 10000))
-    '''
+####################################
+
+scales = []
+for jj in range(0, 50000, batch_size):
+    s = jj
+    e = jj + batch_size
+    xs = x_train[s:e]
+    ys = y_train[s:e]
+    np_model_collect = sess.run(model_collect, feed_dict={x: xs, y: ys})
+    scales.append(np_model_collect)
+    
+scales = np.average(scales, axis=0)
+    
+####################################
+
+total_correct = 0
+for jj in range(0, 10000, batch_size):
+    s = jj
+    e = jj + batch_size
+    xs = x_test[s:e]
+    ys = y_test[s:e]
+    np_sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys, scale: scales})
+    total_correct += np_sum_correct
+        
+print ("acc: " + str(total_correct * 1.0 / 10000))
         
 ####################################
 
