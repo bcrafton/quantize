@@ -14,16 +14,27 @@ from layers import *
 
 ####################################
 
+def quantize_np(x, low, high):
+  scale = (np.max(x) - np.min(x)) / (high - low)
+  x = x / scale
+  x = np.floor(x)
+  x = np.clip(x, low, high)
+  return x
+  
+####################################
+
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
 assert(np.shape(x_train) == (50000, 32, 32, 3))
-x_train = x_train - np.mean(x_train, axis=0, keepdims=True)
-x_train = x_train / np.std(x_train, axis=0, keepdims=True)
+# x_train = x_train - np.mean(x_train, axis=0, keepdims=True)
+# x_train = x_train / np.std(x_train, axis=0, keepdims=True)
+x_train = quantize_np(x_train, 0, 127)
 y_train = keras.utils.to_categorical(y_train, 10)
 
 assert(np.shape(x_test) == (10000, 32, 32, 3))
-x_test = x_test - np.mean(x_test, axis=0, keepdims=True)
-x_test = x_test / np.std(x_test, axis=0, keepdims=True)
+# x_test = x_test - np.mean(x_test, axis=0, keepdims=True)
+# x_test = x_test / np.std(x_test, axis=0, keepdims=True)
+x_test = quantize_np(x_test, 0, 127)
 y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
@@ -31,7 +42,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 epochs = 10
 batch_size = 50
 
-x = tf.placeholder(tf.float32, [None, 32 , 32 , 3])
+x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 scale = tf.placeholder(tf.float32, [5])
 
