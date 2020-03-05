@@ -89,7 +89,8 @@ for jj in range(0, 50000, batch_size):
     np_model_collect = sess.run(model_collect, feed_dict={x: xs, y: ys})
     scales.append(np_model_collect)
     
-scales = np.average(scales, axis=0)
+# this needs to be ceil for cases where (scale < 1), like avg_pool.
+scales = np.ceil(np.average(scales, axis=0))
     
 ####################################
 

@@ -144,7 +144,7 @@ class avg_pool(layer):
 
     def predict(self, x, scale):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = quantize_predict(pool, scale, -128, 127)
+        qpool = quantize_predict(pool, scale, -128, 127) # this only works because we use np.ceil(scales)
         return qpool
 
 #############
