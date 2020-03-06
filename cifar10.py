@@ -62,9 +62,15 @@ model_predict = m.predict(x=x, scale=scale)
 
 ####################################
 
+weights = m.get_weights()
+
+####################################
+
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+
+####################################
 
 loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train)
 params = tf.trainable_variables()
@@ -118,9 +124,17 @@ print ("acc: " + str(total_correct * 1.0 / 10000))
         
 ####################################
 
+w = sess.run(weights, feed_dict={})
 
+'''
+print (w.keys())
+for key in w.keys():
+    print (key, np.shape(w[key]))
+'''
 
+np.save("cifar10_weights", w)
 
+####################################
 
 
 

@@ -48,9 +48,17 @@ class model:
             y = self.layers[l].predict(y, scale[l])
         return y
         
+    def get_weights(self):
+        weights_dict = {}
+        for layer in self.layers:
+            weights_dict.update(layer.get_weights())
+        return weights_dict
+        
 #############
 
 class layer:
+    layer_id = 0
+    
     def __init__(self):
         assert(False)
         
@@ -63,10 +71,16 @@ class layer:
     def predict(self, x, scale):
         assert(False)
         
+    def get_weights(self):
+        assert(False)
+        
 #############
         
 class conv_block(layer):
     def __init__(self, f1, f2, p):
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+        
         self.f1 = f1
         self.f2 = f2
         self.p = p
@@ -96,6 +110,14 @@ class conv_block(layer):
         qpool = quantize_predict(pool, scale, -128, 127)
         return qpool
         
+    def get_weights(self):
+        qf, _ = quantize(self.f, -128, 127)
+    
+        weights_dict = {}
+        weights_dict[self.layer_id] = (qf,)
+        
+        return weights_dict
+        
 #############
 
 class dense_block(layer):
@@ -124,6 +146,14 @@ class dense_block(layer):
         fc = tf.matmul(x, qw)
         qfc = quantize_predict(fc, scale, -128, 127)
         return qfc
+        
+    def get_weights(self):
+        qw, _ = quantize(self.w, -128, 127)
+    
+        weights_dict = {}
+        weights_dict[self.layer_id] = (qw,)
+        
+        return weights_dict
 
 #############
 
@@ -146,6 +176,10 @@ class avg_pool(layer):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = quantize_predict(pool, scale, -128, 127) # this only works because we use np.ceil(scales)
         return qpool
+        
+    def get_weights(self):    
+        weights_dict = {}
+        return weights_dict
 
 #############
 
