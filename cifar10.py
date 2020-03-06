@@ -39,7 +39,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
-epochs = 1
+epochs = 10
 batch_size = 50
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
