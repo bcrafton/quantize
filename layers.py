@@ -122,6 +122,9 @@ class conv_block(layer):
 
 class dense_block(layer):
     def __init__(self, isize, osize):
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+    
         self.isize = isize
         self.osize = osize
         self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='alexnet'), dtype=tf.float32)
