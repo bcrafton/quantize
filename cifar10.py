@@ -127,8 +127,8 @@ print ("acc: " + str(total_correct * 1.0 / 10000))
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
-    w = weight_dict[key]
-    weight_dict[key] = (w, scales[key])
+    (w, b) = weight_dict[key]
+    weight_dict[key] = (w, b, scales[key])
 
 np.save("cifar10_weights", weight_dict)
 
