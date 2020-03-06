@@ -84,7 +84,7 @@ class conv_block(layer):
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='alexnet'), dtype=tf.float32)
+        self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
         
     def train(self, x):
         qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
@@ -114,7 +114,7 @@ class conv_block(layer):
         qf, _ = quantize(self.f, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = (qf,)
+        weights_dict[self.layer_id] = qf
         
         return weights_dict
         
@@ -127,7 +127,7 @@ class dense_block(layer):
     
         self.isize = isize
         self.osize = osize
-        self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='alexnet'), dtype=tf.float32)
+        self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
         
     def train(self, x):
         x = tf.reshape(x, (-1, self.isize))
@@ -154,7 +154,7 @@ class dense_block(layer):
         qw, _ = quantize(self.w, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = (qw,)
+        weights_dict[self.layer_id] = qw
         
         return weights_dict
 
@@ -162,6 +162,9 @@ class dense_block(layer):
 
 class avg_pool(layer):
     def __init__(self, s, p):
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+    
         self.s = s
         self.p = p
         

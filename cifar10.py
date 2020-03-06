@@ -39,7 +39,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
-epochs = 10
+epochs = 1
 batch_size = 50
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -124,15 +124,13 @@ print ("acc: " + str(total_correct * 1.0 / 10000))
         
 ####################################
 
-w = sess.run(weights, feed_dict={})
+weight_dict = sess.run(weights, feed_dict={})
 
-'''
-print (w.keys())
-for key in w.keys():
-    print (key, np.shape(w[key]))
-'''
+for key in weight_dict.keys():
+    w = weight_dict[key]
+    weight_dict[key] = (w, scales[key])
 
-np.save("cifar10_weights", w)
+np.save("cifar10_weights", weight_dict)
 
 ####################################
 
