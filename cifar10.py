@@ -79,19 +79,33 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 loss_class = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train)
 
 params = tf.trainable_variables()
+
 loss_l2 = []
 for p in params:
     loss_l2.append(tf.nn.l2_loss(p))
 loss_l2 = tf.reduce_sum(loss_l2)
-
-# what about letting tf.reduce_std(params) just be the loss ? 
-# that is what we care about really.
 
 # beta = 0.0   # 63%
 # beta = 0.01  # 10%
 beta = 0.001 # 70%
 # beta = 0.003 # 67%
 loss = loss_class + beta * loss_l2
+
+'''
+loss_l1 = []
+for p in params:
+    loss_l1.append(tf.reduce_sum(tf.abs(p)))
+loss_l1 = tf.reduce_sum(loss_l1)
+loss = loss_class + 0.0001 * loss_l1
+'''
+
+'''
+loss_exp = []
+for p in params:
+    loss_exp.append(tf.reduce_sum(tf.exp(-1. * tf.abs(p) / tf.reduce_max(tf.abs(p)))))
+loss_exp = tf.reduce_sum(loss_exp)
+loss = loss_class + 0.00001 * loss_exp
+'''
 
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)

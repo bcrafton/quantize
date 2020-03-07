@@ -94,6 +94,10 @@ class conv_block(layer):
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+        # if we want noise,
+        # quantize_and_dequantize -> quantize, +noise, dequantize
+        # but then we need to do the stop gradient thing.
+        # noise = tf.random.categorical(logits=[0,0,0,0,1], samples=self.f2)
         qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         return qpool
     
