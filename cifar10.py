@@ -107,6 +107,34 @@ loss_exp = tf.reduce_sum(loss_exp)
 loss = loss_class + 0.00001 * loss_exp
 '''
 
+####################################
+'''
+def count_ones(x):
+    count = 0
+    for bit in range(8):
+        count += np.bitwise_and(np.right_shift(x, bit), 1)
+    return count
+
+cost_table_np = np.zeros(shape=256)
+for ii in range(256):
+    cost_table_np[ii] = count_ones(ii)
+    
+cost_table = tf.constant(cost_table_np, dtype=tf.int32)
+
+loss_bit = []
+for p in params:
+    qp, _ = quantize(p, -128, 127)
+    qp_flat = tf.reshape(qp, [-1])
+    qp_flat_int = tf.cast(qp_flat, dtype=tf.int32)
+    gather = tf.gather(params=cost_table, indices=qp_flat_int)
+    loss_bit_p = tf.cast(tf.reduce_sum(gather), dtype=tf.float32)
+    loss_bit.append(tf.reduce_sum(loss_bit_p))
+    
+loss_bit = tf.reduce_sum(loss_bit)
+loss = loss_class + 0.0001 * loss_bit
+'''
+####################################
+
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
 train = tf.train.AdamOptimizer(learning_rate=1e-2, epsilon=1.).apply_gradients(grads_and_vars)

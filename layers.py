@@ -25,11 +25,13 @@ def quantize_and_dequantize(x, low, high):
         return x
 
 def quantize(x, low, high):
-    scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
-    x = x / scale
-    x = tf.floor(x)
-    x = tf.clip_by_value(x, low, high)
-    return x, scale
+    g = tf.get_default_graph()
+    with g.gradient_override_map({"Floor": "Identity"}):
+        scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+        x = x / scale
+        x = tf.floor(x)
+        x = tf.clip_by_value(x, low, high)
+        return x, scale
     
 def quantize_predict(x, scale, low, high):
     x = x / scale
