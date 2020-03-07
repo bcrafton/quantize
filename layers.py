@@ -9,6 +9,16 @@ from bc_utils.init_tensor import init_matrix
 
 #############
 
+def quantize_and_dequantize(x, low, high):
+    g = tf.get_default_graph()
+    with g.gradient_override_map({"Floor": "Identity"}):
+        scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+        x = x / scale
+        x = tf.floor(x)
+        x = tf.clip_by_value(x, low, high)
+        x = x * scale
+        return x
+
 def quantize(x, low, high):
     scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
     x = x / scale
@@ -88,8 +98,10 @@ class conv_block(layer):
         self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=False)
         
     def train(self, x):
-        qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        qf = quantize_and_dequantize(self.f, -128, 127)
+        qb = quantize_and_dequantize(self.b, -128, 127)
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
@@ -98,7 +110,8 @@ class conv_block(layer):
         # quantize_and_dequantize -> quantize, +noise, dequantize
         # but then we need to do the stop gradient thing.
         # noise = tf.random.categorical(logits=[0,0,0,0,1], samples=self.f2)
-        qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        qpool = quantize_and_dequantize(pool, -128, 127)
         return qpool
     
     def collect(self, x):
@@ -143,12 +156,15 @@ class dense_block(layer):
         self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
     def train(self, x):
-        qw = tf.quantization.quantize_and_dequantize(input=self.w, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qw = tf.quantization.quantize_and_dequantize(input=self.w, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        qw = quantize_and_dequantize(self.w, -128, 127)
+        qb = quantize_and_dequantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) # + qb
-        qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        # qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        qfc = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
     def collect(self, x):
