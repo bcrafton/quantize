@@ -9,6 +9,11 @@ from bc_utils.init_tensor import init_matrix
 
 #############
 
+# tried doing:
+# 1) tf.stop_gradient(quantize_and_dequantize())
+# 2) with g.gradient_override_map({"Floor": "Identity"}):
+# only #2 worked.
+
 def quantize_and_dequantize(x, low, high):
     g = tf.get_default_graph()
     with g.gradient_override_map({"Floor": "Identity"}):
