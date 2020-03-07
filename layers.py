@@ -85,13 +85,13 @@ class conv_block(layer):
         self.f2 = f2
         self.p = p
         self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-        self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
+        self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=False)
         
     def train(self, x):
         qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
@@ -101,7 +101,7 @@ class conv_block(layer):
         qf, _ = quantize(self.f, -128, 127)
         qb, _ = quantize(self.b, -128, 127)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool, spool = quantize(pool, -128, 127)
@@ -111,7 +111,7 @@ class conv_block(layer):
         qf, _ = quantize(self.f, -128, 127)
         qb, _ = quantize(self.b, -128, 127)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
@@ -136,14 +136,14 @@ class dense_block(layer):
         self.isize = isize
         self.osize = osize
         self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
-        self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32)
+        self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
     def train(self, x):
         qw = tf.quantization.quantize_and_dequantize(input=self.w, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
+        fc = tf.matmul(x, qw) # + qb
         qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         return qfc
     
@@ -152,7 +152,7 @@ class dense_block(layer):
         qb, _ = quantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
+        fc = tf.matmul(x, qw) # + qb
         qfc, sfc = quantize(fc, -128, 127)
         return qfc, sfc
 
@@ -161,7 +161,7 @@ class dense_block(layer):
         qb, _ = quantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw)
+        fc = tf.matmul(x, qw) # + qb
         qfc = quantize_predict(fc, scale, -128, 127)
         return qfc
         
