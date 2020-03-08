@@ -32,6 +32,13 @@ def quantize(x, low, high):
         x = tf.floor(x)
         x = tf.clip_by_value(x, low, high)
         return x, scale
+        
+def dequantize(x, low, high):
+    g = tf.get_default_graph()
+    with g.gradient_override_map({"Floor": "Identity"}):
+        scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+        x = x * scale
+        return x
     
 def quantize_predict(x, scale, low, high):
     x = x / scale
@@ -113,12 +120,18 @@ class conv_block(layer):
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+
         # if we want noise,
         # quantize_and_dequantize -> quantize, +noise, dequantize
-        # but then we need to do the stop gradient thing.
-        # noise = tf.random.categorical(logits=[0,0,0,0,1], samples=self.f2)
         # qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        qpool = quantize_and_dequantize(pool, -128, 127)
+
+        qpool, _ = quantize(pool, -128, 127)
+        
+        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
+        noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
+        qpool = qpool + noise
+        
+        qpool = dequantize(qpool, -128, 127)
         return qpool
     
     def collect(self, x):

@@ -39,7 +39,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
-epochs = 10
+epochs = 20
 batch_size = 50
 
 m = model(layers=[
@@ -76,20 +76,24 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
 ####################################
 
-loss_class = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train)
+loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train))
 
 params = tf.trainable_variables()
+
+####################################
 
 loss_l2 = []
 for p in params:
     loss_l2.append(tf.nn.l2_loss(p))
 loss_l2 = tf.reduce_sum(loss_l2)
 
-# beta = 0.0   # 63%
+beta = 0.0   # 63%
 # beta = 0.01  # 10%
-beta = 0.001 # 70%
+# beta = 0.001 # 70%
 # beta = 0.003 # 67%
 loss = loss_class + beta * loss_l2
+
+####################################
 
 '''
 loss_l1 = []
@@ -98,6 +102,8 @@ for p in params:
 loss_l1 = tf.reduce_sum(loss_l1)
 loss = loss_class + 0.0001 * loss_l1
 '''
+
+####################################
 
 '''
 loss_exp = []
@@ -108,6 +114,9 @@ loss = loss_class + 0.00001 * loss_exp
 '''
 
 ####################################
+# this dont work it seems.
+# also would need to offset x.
+# we never add 128.
 '''
 def count_ones(x):
     count = 0
@@ -132,6 +141,12 @@ for p in params:
     
 loss_bit = tf.reduce_sum(loss_bit)
 loss = loss_class + 0.0001 * loss_bit
+'''
+####################################
+'''
+# l1 loss with higher cost on 
+# 1) small negative numbers
+# 2) large positive numbers.
 '''
 ####################################
 
