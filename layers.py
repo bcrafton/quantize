@@ -152,6 +152,12 @@ class conv_block(layer):
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
+
+        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
+        noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
+        # noise = tf.Print(noise, [tf.math.reduce_std(qpool), tf.math.reduce_std(noise)], message='', summarize=1000)
+        qpool = qpool + noise
+
         return qpool
         
     def get_weights(self):

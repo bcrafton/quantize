@@ -87,9 +87,9 @@ for p in params:
     loss_l2.append(tf.nn.l2_loss(p))
 loss_l2 = tf.reduce_sum(loss_l2)
 
-beta = 0.0   # 63%
+# beta = 0.0   # 63%
 # beta = 0.01  # 10%
-# beta = 0.001 # 70%
+beta = 0.001 # 70%
 # beta = 0.003 # 67%
 loss = loss_class + beta * loss_l2
 
@@ -152,7 +152,7 @@ loss = loss_class + 0.0001 * loss_bit
 
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=1e-2, epsilon=1.).apply_gradients(grads_and_vars)
+train = tf.train.AdamOptimizer(learning_rate=1e-3, epsilon=1.).apply_gradients(grads_and_vars)
 
 ####################################
 
