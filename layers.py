@@ -127,6 +127,7 @@ class conv_block(layer):
 
         qpool, _ = quantize(pool, -128, 127)
         
+        # we should never subtract, because we do relu ... so that is nice actually.
         noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
         noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
         qpool = qpool + noise
@@ -153,6 +154,7 @@ class conv_block(layer):
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
 
+        # we should never subtract, because we do relu ... so that is nice actually.
         noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
         noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
         # noise = tf.Print(noise, [tf.math.reduce_std(qpool), tf.math.reduce_std(noise)], message='', summarize=1000)

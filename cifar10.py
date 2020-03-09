@@ -39,7 +39,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
-epochs = 20
+epochs = 10
 batch_size = 50
 
 m = model(layers=[
