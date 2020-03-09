@@ -1,5 +1,21 @@
 
+import argparse
 import os
+import sys
+
+##############################################
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--eps', type=float, default=1.)
+parser.add_argument('--noise', type=float, default=2.)
+parser.add_argument('--gpu', type=int, default=0)
+parser.add_argument('--init', type=str, default="glorot_uniform")
+parser.add_argument('--name', type=str, default="cifar10_weights")
+args = parser.parse_args()
+
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 
@@ -39,21 +55,18 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
-epochs = 10
-batch_size = 50
-
 m = model(layers=[
-conv_block(3,   32, 1),
-conv_block(32,  32, 2),
+conv_block(3,   32, 1, noise=args.noise),
+conv_block(32,  32, 2, noise=args.noise),
 
-conv_block(32,  64, 1),
-conv_block(64,  64, 2),
+conv_block(32,  64, 1, noise=args.noise),
+conv_block(64,  64, 2, noise=args.noise),
 
-conv_block(64,  128, 1),
-conv_block(128, 128, 2),
+conv_block(64,  128, 1, noise=args.noise),
+conv_block(128, 128, 2, noise=args.noise),
 
 avg_pool(4, 4),
-dense_block(128, 10)
+dense_block(128, 10, noise=args.noise)
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -95,64 +108,9 @@ loss = loss_class + beta * loss_l2
 
 ####################################
 
-'''
-loss_l1 = []
-for p in params:
-    loss_l1.append(tf.reduce_sum(tf.abs(p)))
-loss_l1 = tf.reduce_sum(loss_l1)
-loss = loss_class + 0.0001 * loss_l1
-'''
-
-####################################
-
-'''
-loss_exp = []
-for p in params:
-    loss_exp.append(tf.reduce_sum(tf.exp(-1. * tf.abs(p) / tf.reduce_max(tf.abs(p)))))
-loss_exp = tf.reduce_sum(loss_exp)
-loss = loss_class + 0.00001 * loss_exp
-'''
-
-####################################
-# this dont work it seems.
-# also would need to offset x.
-# we never add 128.
-'''
-def count_ones(x):
-    count = 0
-    for bit in range(8):
-        count += np.bitwise_and(np.right_shift(x, bit), 1)
-    return count
-
-cost_table_np = np.zeros(shape=256)
-for ii in range(256):
-    cost_table_np[ii] = count_ones(ii)
-    
-cost_table = tf.constant(cost_table_np, dtype=tf.int32)
-
-loss_bit = []
-for p in params:
-    qp, _ = quantize(p, -128, 127)
-    qp_flat = tf.reshape(qp, [-1])
-    qp_flat_int = tf.cast(qp_flat, dtype=tf.int32)
-    gather = tf.gather(params=cost_table, indices=qp_flat_int)
-    loss_bit_p = tf.cast(tf.reduce_sum(gather), dtype=tf.float32)
-    loss_bit.append(tf.reduce_sum(loss_bit_p))
-    
-loss_bit = tf.reduce_sum(loss_bit)
-loss = loss_class + 0.0001 * loss_bit
-'''
-####################################
-'''
-# l1 loss with higher cost on 
-# 1) small negative numbers
-# 2) large positive numbers.
-'''
-####################################
-
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=1e-3, epsilon=1.).apply_gradients(grads_and_vars)
+train = tf.train.AdamOptimizer(learning_rate=args.lr, epsilon=args.eps).apply_gradients(grads_and_vars)
 
 ####################################
 
@@ -163,11 +121,11 @@ sess.run(tf.global_variables_initializer())
 
 ####################################
 
-for ii in range(epochs):
-    print ("epoch %d/%d" % (ii, epochs))
-    for jj in range(0, 50000, batch_size):
+for ii in range(args.epochs):
+    print ("epoch %d/%d" % (ii, args.epochs))
+    for jj in range(0, 50000, args.batch_size):
         s = jj
-        e = jj + batch_size
+        e = jj + args.batch_size
         xs = x_train[s:e]
         ys = y_train[s:e]
         sess.run([train], feed_dict={x: xs, y: ys})
@@ -175,9 +133,9 @@ for ii in range(epochs):
 ####################################
 
 scales = []
-for jj in range(0, 50000, batch_size):
+for jj in range(0, 50000, args.batch_size):
     s = jj
-    e = jj + batch_size
+    e = jj + args.batch_size
     xs = x_train[s:e]
     ys = y_train[s:e]
     np_model_collect = sess.run(model_collect, feed_dict={x: xs, y: ys})
@@ -189,9 +147,9 @@ scales = np.ceil(np.average(scales, axis=0))
 ####################################
 
 total_correct = 0
-for jj in range(0, 10000, batch_size):
+for jj in range(0, 10000, args.batch_size):
     s = jj
-    e = jj + batch_size
+    e = jj + args.batch_size
     xs = x_test[s:e]
     ys = y_test[s:e]
     np_sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys, scale: scales})
@@ -207,7 +165,7 @@ for key in weight_dict.keys():
     (w, b) = weight_dict[key]
     weight_dict[key] = (w, b, scales[key])
 
-np.save("cifar10_weights", weight_dict)
+np.save(args.name, weight_dict)
 
 ####################################
 

@@ -101,7 +101,7 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p):
+    def __init__(self, f1, f2, p, noise):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
@@ -110,6 +110,7 @@ class conv_block(layer):
         self.p = p
         self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
         self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=False)
+        self.noise = noise
         
     def train(self, x):
         # qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
@@ -127,8 +128,8 @@ class conv_block(layer):
 
         qpool, _ = quantize(pool, -128, 127)
         
-        # we should never subtract, because we do relu ... so that is nice actually.
-        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
+        # TODO: we should never subtract, because we do relu ... so that is nice actually.
+        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=self.noise)
         noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
         qpool = qpool + noise
         
@@ -154,8 +155,8 @@ class conv_block(layer):
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
 
-        # we should never subtract, because we do relu ... so that is nice actually.
-        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=1.0)
+        # TODO: we should never subtract, because we do relu ... so that is nice actually.
+        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=self.noise)
         noise = tf.floor(tf.abs(noise)) * tf.sign(noise)
         # noise = tf.Print(noise, [tf.math.reduce_std(qpool), tf.math.reduce_std(noise)], message='', summarize=1000)
         qpool = qpool + noise
@@ -174,7 +175,7 @@ class conv_block(layer):
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize):
+    def __init__(self, isize, osize, noise):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
     
@@ -182,6 +183,7 @@ class dense_block(layer):
         self.osize = osize
         self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
         self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+        self.noise = noise
         
     def train(self, x):
         # qw = tf.quantization.quantize_and_dequantize(input=self.w, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
