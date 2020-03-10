@@ -18,7 +18,7 @@ num_runs = len(runs)
 for ii in range(num_runs):
     param = runs[ii]
 
-    name = '%s_%d_%f_%f' % (
+    name = '%s_%d_%f_%f.npy' % (
             param['benchmark'], 
             param['batch_size'],
             param['lr'], 
@@ -27,7 +27,8 @@ for ii in range(num_runs):
 
     res = np.load(name, allow_pickle=True).item()
     key = (param['benchmark'], param['batch_size'], param['lr'], param['noise'])
-    val = max(res['acc'])
+    # val = max(res['acc'])
+    val = res['acc']
 
     print (name, val)
     if key in results.keys():
@@ -36,8 +37,8 @@ for ii in range(num_runs):
     else:
         results[key] = val
             
-for key in sorted(results.keys()):   
-    print (key, results[key])
+# for key in sorted(results.keys()):   
+    # print (key, results[key])
 
 
 
