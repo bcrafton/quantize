@@ -154,8 +154,9 @@ for jj in range(0, 10000, args.batch_size):
     ys = y_test[s:e]
     np_sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys, scale: scales})
     total_correct += np_sum_correct
-        
-print ("acc: " + str(total_correct * 1.0 / 10000))
+
+acc = total_correct / 10000
+print ("acc: %f" % (acc))
         
 ####################################
 
@@ -164,6 +165,8 @@ weight_dict = sess.run(weights, feed_dict={})
 for key in weight_dict.keys():
     (w, b) = weight_dict[key]
     weight_dict[key] = (w, b, scales[key])
+
+weight_dict['acc'] = acc
 
 np.save(args.name, weight_dict)
 
