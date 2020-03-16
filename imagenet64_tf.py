@@ -21,7 +21,7 @@ if args.gpu >= 0:
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)
 
-exxact = 1
+exxact = 0
 if exxact:
     val_path = '/home/bcrafton3/Data_SSD/datasets/imagenet64/tfrecord/val/'
     train_path = '/home/bcrafton3/Data_SSD/datasets/imagenet64/tfrecord/train/'
@@ -39,6 +39,8 @@ np.set_printoptions(threshold=1000)
 
 from bc_utils.init_tensor import init_filters
 from bc_utils.init_tensor import init_matrix
+
+from layers import *
 
 MEAN = [122.77093945, 116.74601272, 104.09373519]
 
@@ -191,16 +193,16 @@ conv_block(512,  1024, 1, noise=args.noise),
 conv_block(1024, 1024, 1, noise=args.noise),
 
 avg_pool(4, 4),
-dense_block(1024, 10, noise=args.noise)
+dense_block(1024, 1000, noise=args.noise)
 ])
 
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
 scale = tf.placeholder(tf.float32, [len(m.layers)])
-model_train = m.train(x=x)
-model_collect = m.collect(x=x)
-model_predict = m.predict(x=x, scale=scale)
+model_train = m.train(x=features)
+model_collect = m.collect(x=features)
+model_predict = m.predict(x=features, scale=scale)
 
 ###############################################################
 
@@ -212,7 +214,7 @@ total_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 train = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=args.eps).minimize(loss)
 '''
 
-loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train))
+loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
 params = tf.trainable_variables()
 
 loss_l2 = []
@@ -262,6 +264,7 @@ for ii in range(0, args.epochs):
 
     sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
+    scales = []
     for jj in range(0, len(val_filenames), args.batch_size):
 
         np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
