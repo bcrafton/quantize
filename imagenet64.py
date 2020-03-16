@@ -216,6 +216,10 @@ model_train = m.train(x=features)
 model_collect = m.collect(x=features)
 model_predict = m.predict(x=features, scale=scale)
 
+predict = tf.argmax(model_predict, axis=1)
+correct = tf.equal(predict, tf.argmax(labels, 1))
+sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+
 ###############################################################
 
 '''
@@ -256,41 +260,50 @@ val_handle = sess.run(val_iterator.string_handle())
 ###############################################################
 
 for ii in range(0, args.epochs):
-
     print('epoch %d/%d' % (ii, args.epochs))
-
-    ##################################################################
 
     sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
 
     start = time.time()
-    for jj in range(0, 50000, args.batch_size):
-    # for jj in range(0, len(train_filenames), args.batch_size):
+    for jj in range(0, len(train_filenames), args.batch_size):
         sess.run([train], feed_dict={handle: train_handle, learning_rate: args.lr})
         if (jj % (100 * args.batch_size) == 0):
             img_per_sec = (jj + args.batch_size) / (time.time() - start)
             p = "%d | img/s: %f" % (jj, img_per_sec)
             print (p)
 
-    ##################################################################
+##################################################################
 
-    sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
+# probably want to use training data for this ...
+sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
-    scales = []
+scales = []
 
-    start = time.time()
-    for jj in range(0, len(val_filenames), args.batch_size):
-        np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
-        scales.append(np_model_collect)
-        if (jj % (100 * args.batch_size) == 0):
-            img_per_sec = (jj + args.batch_size) / (time.time() - start)
-            p = "%d | img/s: %f" % (jj, img_per_sec)
-            print (p)
+start = time.time()
+for jj in range(0, len(val_filenames), args.batch_size):
+    np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
+    scales.append(np_model_collect)
+    if (jj % (100 * args.batch_size) == 0):
+        img_per_sec = (jj + args.batch_size) / (time.time() - start)
+        p = "%d | img/s: %f" % (jj, img_per_sec)
+        print (p)
 
-    scales = np.ceil(np.average(scales, axis=0))
+scales = np.ceil(np.average(scales, axis=0))
 
-    ##################################################################
+##################################################################
             
-print (scales)
-            
+sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
+
+total_correct = 0
+
+for jj in range(0, len(val_filenames), args.batch_size):
+    np_sum_correct = sess.run(sum_correct, feed_dict={handle: val_handle, scale: scales, learning_rate: 0.0})
+    total_correct += np_sum_correct
+
+acc = total_correct / len(val_filenames)
+print ("acc: %f" % (acc))
+
+##################################################################
+
+
 
