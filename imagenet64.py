@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
@@ -46,10 +46,6 @@ MEAN = [122.77093945, 116.74601272, 104.09373519]
 
 ##############################################
 
-def parse_function(filename, label):
-    conv = tf.read_file(filename)
-    return conv, label
-
 def get_val_filenames():
     val_filenames = []
 
@@ -62,7 +58,8 @@ def get_val_filenames():
     np.random.shuffle(val_filenames)
 
     remainder = len(val_filenames) % args.batch_size
-    val_filenames = val_filenames[:(-remainder)]
+    if (remainder):
+        val_filenames = val_filenames[:(-remainder)]
 
     return val_filenames
 
@@ -78,7 +75,8 @@ def get_train_filenames():
     np.random.shuffle(train_filenames)
 
     remainder = len(train_filenames) % args.batch_size
-    train_filenames = train_filenames[:(-remainder)]
+    if (remainder):
+        train_filenames = train_filenames[:(-remainder)]
 
     return train_filenames
 
@@ -93,8 +91,10 @@ def extract_fn(record):
     image = tf.cast(image, dtype=tf.float32)
     image = tf.reshape(image, (1, 64, 64, 3))
 
-    means = tf.reshape(tf.constant(MEAN), [1, 1, 1, 3])
-    image = (image - means) / 255. * 2.
+    # means = tf.reshape(tf.constant(MEAN), [1, 1, 1, 3])
+    # image = (image - means) / 255. * 2.
+    image, _ = quantize(image, 0, 127)
+    
 
     label = sample['label']
     return [image, label]
@@ -196,6 +196,18 @@ avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
 
+m = model(layers=[
+conv_block(3,    64, 1, noise=args.noise),
+conv_block(64,   64, 2, noise=args.noise),
+conv_block(64,   128, 2, noise=args.noise),
+conv_block(128,  256, 2, noise=args.noise),
+conv_block(256,  512, 2, noise=args.noise),
+conv_block(512,  1024, 1, noise=args.noise),
+
+avg_pool(4, 4),
+dense_block(1024, 1000, noise=args.noise)
+])
+
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
@@ -252,8 +264,8 @@ for ii in range(0, args.epochs):
     sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
 
     start = time.time()
-    for jj in range(0, len(train_filenames), args.batch_size):
-
+    for jj in range(0, 50000, args.batch_size):
+    # for jj in range(0, len(train_filenames), args.batch_size):
         sess.run([train], feed_dict={handle: train_handle, learning_rate: args.lr})
         if (jj % (100 * args.batch_size) == 0):
             img_per_sec = (jj + args.batch_size) / (time.time() - start)
@@ -265,15 +277,20 @@ for ii in range(0, args.epochs):
     sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
     scales = []
-    for jj in range(0, len(val_filenames), args.batch_size):
 
+    start = time.time()
+    for jj in range(0, len(val_filenames), args.batch_size):
         np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
         scales.append(np_model_collect)
-            
+        if (jj % (100 * args.batch_size) == 0):
+            img_per_sec = (jj + args.batch_size) / (time.time() - start)
+            p = "%d | img/s: %f" % (jj, img_per_sec)
+            print (p)
+
     scales = np.ceil(np.average(scales, axis=0))
 
     ##################################################################
             
-            
+print (scales)
             
 
