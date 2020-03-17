@@ -9,7 +9,7 @@ import sys
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--lr', type=float, default=1e-2)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--noise', type=float, default=0.)
 parser.add_argument('--gpu', type=int, default=0)
@@ -91,11 +91,12 @@ def extract_fn(record):
     image = tf.cast(image, dtype=tf.float32)
     image = tf.reshape(image, (1, 64, 64, 3))
 
-    # means = tf.reshape(tf.constant(MEAN), [1, 1, 1, 3])
+    means = tf.reshape(tf.constant(MEAN), [1, 1, 1, 3])
     # image = (image - means) / 255. * 2.
+    image = image - means
+    image = image - tf.reduce_min(image)
     image, _ = quantize(image, 0, 127)
     
-
     label = sample['label']
     return [image, label]
 
@@ -134,7 +135,7 @@ train_iterator = train_dataset.make_initializable_iterator()
 val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
-
+'''
 def batch_norm(x, f, name):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32, name=name+'_gamma')
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32, name=name+'_beta')
@@ -148,34 +149,20 @@ def block(x, f1, f2, p, name):
     filters2 = tf.Variable(init_filters(size=[3,3,f2,f2], init='alexnet'), dtype=tf.float32, name=name+'_conv2')
 
     conv1 = tf.nn.conv2d(x, filters1, [1,1,1,1], 'SAME')
-    # bn1   = batch_norm(conv1, f2, name+'_bn1')
+    bn1   = batch_norm(conv1, f2, name+'_bn1')
     relu1 = tf.nn.relu(bn1)
 
     conv2 = tf.nn.conv2d(relu1, filters2, [1,1,1,1], 'SAME')
-    # bn2   = batch_norm(conv2, f2, name+'_bn2')
+    bn2   = batch_norm(conv2, f2, name+'_bn2')
     relu2 = tf.nn.relu(bn2)
 
     pool = tf.nn.avg_pool(relu2, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
 
     return pool
-
+'''
 ###############################################################
 
 '''
-block1 = block(features, 3,  64,   2, 'block1')                                      # 64
-block2 = block(block1,   64,  128,  2, 'block2')                                     # 32
-block3 = block(block2,   128, 256,  2, 'block3')                                     # 16
-block4 = block(block3,   256, 512,  2, 'block4')                                     # 8
-block5 = block(block4,   512, 1024, 1, 'block5')                                     # 4
-pool   = tf.nn.avg_pool(block5, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME')  # 1
-
-flat   = tf.reshape(pool, [args.batch_size, 1024])
-
-mat1   = tf.Variable(init_matrix(size=(1024, 1000), init='alexnet'), dtype=tf.float32, name='fc1')
-bias1  = tf.Variable(np.zeros(shape=1000), dtype=tf.float32, name='fc1_bias')
-fc1    = tf.matmul(flat, mat1) + bias1
-'''
-
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise),
 conv_block(64,   64, 2, noise=args.noise),
@@ -195,8 +182,10 @@ conv_block(1024, 1024, 1, noise=args.noise),
 avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
-
 '''
+
+###############################################################
+
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise),
 conv_block(64,   64, 2, noise=args.noise),
@@ -208,15 +197,18 @@ conv_block(512,  1024, 1, noise=args.noise),
 avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
-'''
 
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
 scale = tf.placeholder(tf.float32, [len(m.layers)])
-model_train = m.train(x=features)
+model_train, mean, var = m.train(x=features)
 model_collect = m.collect(x=features)
 model_predict = m.predict(x=features, scale=scale)
+
+train_predict = tf.argmax(model_train, axis=1)
+train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
+train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
 
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
@@ -227,14 +219,6 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 weights = m.get_weights()
 
 ####################################
-
-'''
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc1, labels=labels))
-correct = tf.equal(tf.argmax(fc1, axis=1), tf.argmax(labels, 1))
-total_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-
-train = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=args.eps).minimize(loss)
-'''
 
 loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
 params = tf.trainable_variables()
@@ -265,49 +249,61 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
+mean_list = deque(maxlen=128)
+var_list = deque(maxlen=128)
+
+###############################################################
+
 for ii in range(0, args.epochs):
     print('epoch %d/%d' % (ii, args.epochs))
 
     sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
 
+    total_correct = 0
+
     start = time.time()
     for jj in range(0, len(train_filenames), args.batch_size):
-        sess.run([train], feed_dict={handle: train_handle, learning_rate: args.lr})
+        [np_sum_correct, np_mean, np_var, _] = sess.run([train_sum_correct, mean, var, train], feed_dict={handle: train_handle, learning_rate: args.lr})
+        mean_list.append(np_mean)
+        var_list.append(np_var)
+
+        total_correct += np_sum_correct
+        if (jj % (100 * args.batch_size) == 0):
+            img_per_sec = (jj + args.batch_size) / (time.time() - start)
+            acc = total_correct / (jj + args.batch_size)
+            p = "%d | img/s: %f | acc: %f" % (jj, img_per_sec, acc)
+            print (p)
+
+    ##################################################################
+
+    # probably want to use training data for this ...
+    sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
+
+    scales = []
+
+    start = time.time()
+    for jj in range(0, len(val_filenames), args.batch_size):
+        np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
+        scales.append(np_model_collect)
         if (jj % (100 * args.batch_size) == 0):
             img_per_sec = (jj + args.batch_size) / (time.time() - start)
             p = "%d | img/s: %f" % (jj, img_per_sec)
             print (p)
 
-##################################################################
+    scales = np.ceil(np.average(scales, axis=0))
 
-# probably want to use training data for this ...
-sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
+    ##################################################################
+                
+    sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
-scales = []
+    total_correct = 0
 
-start = time.time()
-for jj in range(0, len(val_filenames), args.batch_size):
-    np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
-    scales.append(np_model_collect)
-    if (jj % (100 * args.batch_size) == 0):
-        img_per_sec = (jj + args.batch_size) / (time.time() - start)
-        p = "%d | img/s: %f" % (jj, img_per_sec)
-        print (p)
+    for jj in range(0, len(val_filenames), args.batch_size):
+        np_sum_correct = sess.run(sum_correct, feed_dict={handle: val_handle, scale: scales, learning_rate: 0.0})
+        total_correct += np_sum_correct
 
-scales = np.ceil(np.average(scales, axis=0))
-
-##################################################################
-            
-sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
-
-total_correct = 0
-
-for jj in range(0, len(val_filenames), args.batch_size):
-    np_sum_correct = sess.run(sum_correct, feed_dict={handle: val_handle, scale: scales, learning_rate: 0.0})
-    total_correct += np_sum_correct
-
-acc = total_correct / len(val_filenames)
-print ("acc: %f" % (acc))
+    acc = total_correct / len(val_filenames)
+    print ("acc: %f" % (acc))
 
 ##################################################################
 

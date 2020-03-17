@@ -7,6 +7,8 @@ import tensorflow as tf
 from bc_utils.init_tensor import init_filters
 from bc_utils.init_tensor import init_matrix
 
+from collections import deque
+
 #############
 
 # tried doing:
@@ -53,10 +55,16 @@ class model:
         self.layers = layers
         
     def train(self, x):
+        mean_list = []
+        var_list = []
+
         y = x
         for layer in self.layers:
-            y = layer.train(y)
-        return y
+            y, mean, var = layer.train(y)
+            mean_list.append(mean)
+            var_list.append(var)
+
+        return y, mean_list, var_list
     
     def collect(self, x):
         scale = []
@@ -109,17 +117,23 @@ class conv_block(layer):
         self.f2 = f2
         self.p = p
         self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-        self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=False)
+        self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, trainable=True)
+        self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=True)
         self.noise = noise
-        
+      
     def train(self, x):
         # qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         # qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qf = quantize_and_dequantize(self.f, -128, 127)
         qb = quantize_and_dequantize(self.b, -128, 127)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
-        relu = tf.nn.relu(conv)
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') 
+
+        mean = tf.reduce_mean(conv, axis=[0,1,2])
+        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+        bn   = tf.nn.batch_normalization(x=conv, mean=mean, variance=var, offset=self.b, scale=self.g, variance_epsilon=1e-3)
+
+        relu = tf.nn.relu(bn)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
         # if we want noise,
@@ -134,23 +148,27 @@ class conv_block(layer):
         qpool = qpool + noise
         
         qpool = dequantize(qpool, -128, 127)
-        return qpool
+        return qpool, [mean], [var]
     
     def collect(self, x):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
-        
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
+        # qf = (self.gamma * self.f) / std
+        # qb = self.b - ((self.gamma * mean) / std)
+        qf, _ = quantize((self.f * self.g), -128, 127)
+        qb, _ = quantize((self.b - self.g), -128, 127)
+
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool, spool = quantize(pool, -128, 127)
         return qpool, spool
 
     def predict(self, x, scale):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        # qf = (self.gamma * self.f) / std
+        # qb = self.b - ((self.gamma * mean) / std)
+        qf, _ = quantize((self.f * self.g), -128, 127)
+        qb, _ = quantize((self.b - self.g), -128, 127)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
@@ -192,17 +210,17 @@ class dense_block(layer):
         qb = quantize_and_dequantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) 
         # qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qfc = quantize_and_dequantize(fc, -128, 127)
-        return qfc
+        return qfc, [], []
     
     def collect(self, x):
         qw, _ = quantize(self.w, -128, 127)
         qb, _ = quantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) 
         qfc, sfc = quantize(fc, -128, 127)
         return qfc, sfc
 
@@ -211,7 +229,7 @@ class dense_block(layer):
         qb, _ = quantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) 
         qfc = quantize_predict(fc, scale, -128, 127)
         return qfc
         
@@ -237,7 +255,7 @@ class avg_pool(layer):
     def train(self, x):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        return qpool
+        return qpool, [], []
     
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
