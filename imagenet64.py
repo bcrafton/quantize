@@ -11,7 +11,7 @@ parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
-parser.add_argument('--noise', type=float, default=2.)
+parser.add_argument('--noise', type=float, default=0.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--init', type=str, default="glorot_uniform")
 parser.add_argument('--name', type=str, default="imagenet_weights")
@@ -176,7 +176,6 @@ bias1  = tf.Variable(np.zeros(shape=1000), dtype=tf.float32, name='fc1_bias')
 fc1    = tf.matmul(flat, mat1) + bias1
 '''
 
-'''
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise),
 conv_block(64,   64, 2, noise=args.noise),
@@ -196,8 +195,8 @@ conv_block(1024, 1024, 1, noise=args.noise),
 avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
-'''
 
+'''
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise),
 conv_block(64,   64, 2, noise=args.noise),
@@ -209,6 +208,7 @@ conv_block(512,  1024, 1, noise=args.noise),
 avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
+'''
 
 ###############################################################
 
