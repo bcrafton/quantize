@@ -107,16 +107,28 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p, noise):
+    def __init__(self, f1, f2, p, noise, weights):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-        self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, trainable=True)
-        self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=True)
+
+        if weights:
+            f, b = weights
+            assert (np.shape(f) == (3,3,self.f1,self.f2))
+            print (self.layer_id)
+            print (np.min(f), np.max(f), np.mean(f), np.std(f))
+            print (np.min(b), np.max(b), np.mean(b), np.std(b))
+            self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
+            self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, trainable=False)
+            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+        else:
+            self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
+            self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, trainable=True)
+            self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=True)
+
         self.noise = noise
       
     def train(self, x):
@@ -191,14 +203,25 @@ class conv_block(layer):
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize, noise):
+    def __init__(self, isize, osize, noise, weights):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
     
         self.isize = isize
         self.osize = osize
-        self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
-        self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+
+        if weights:
+            w, b = weights
+            assert (np.shape(w) == (self.isize, self.osize))
+            print (self.layer_id)
+            print (np.min(w), np.max(w), np.mean(w), np.std(w))
+            print (np.min(b), np.max(b), np.mean(b), np.std(b))
+            self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
+            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+        else:
+            self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
+            self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+
         self.noise = noise
         
     def train(self, x):

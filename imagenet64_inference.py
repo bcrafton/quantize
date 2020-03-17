@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=2)
+parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-2)
 parser.add_argument('--eps', type=float, default=1.)
@@ -28,32 +28,6 @@ if exxact:
 else:
     val_path = '/usr/scratch/datasets/imagenet64/tfrecord/val/'
     train_path = '/usr/scratch/datasets/imagenet64/tfrecord/train/'
-
-##############################################
-
-def create_stats_dict(stats_list):
-    stats_dict = {}
-    for example_dict in stats_list:
-        for layer in example_dict.keys():
-            layer_dict = example_dict[layer]
-            for stat in layer_dict.keys():
-                if layer not in stats_dict.keys():
-                    stats_dict[layer] = {}
-
-                stat_value = layer_dict[stat]
-                if stat not in stats_dict[layer].keys():
-                    stats_dict[layer][stat] = [stat_value]
-                else:
-                    stats_dict[layer][stat].append(stat_value)
-
-    for layer in stats_dict.keys():
-        for stat in stats_dict[layer].keys():
-            if stat == 'var':
-                stats_dict[layer][stat] = np.mean(np.sqrt(stats_dict[layer][stat]), axis=0)
-            else:
-                stats_dict[layer][stat] = np.mean(stats_dict[layer][stat], axis=0)
-
-    return stats_dict
 
 ##############################################
 
@@ -212,25 +186,28 @@ dense_block(1024, 1000, noise=args.noise)
 
 ###############################################################
 
+weights_dict = np.load('imagenet_weights.npy', allow_pickle=True).item()
+
 m = model(layers=[
-conv_block(3,    64, 1, args.noise, weights=None),
-conv_block(64,   64, 2, args.noise, weights=None),
-conv_block(64,   128, 2, args.noise, weights=None),
-conv_block(128,  256, 2, args.noise, weights=None),
-conv_block(256,  512, 2, args.noise, weights=None),
-conv_block(512,  1024, 1, args.noise, weights=None),
+conv_block(3,    64, 1, args.noise, weights_dict[0]),
+conv_block(64,   64, 2, args.noise, weights_dict[1]),
+conv_block(64,   128, 2, args.noise, weights_dict[2]),
+conv_block(128,  256, 2, args.noise, weights_dict[3]),
+conv_block(256,  512, 2, args.noise, weights_dict[4]),
+conv_block(512,  1024, 1, args.noise, weights_dict[5]),
 
 avg_pool(4, 4),
-dense_block(1024, 1000, args.noise, weights=None)
+dense_block(1024, 1000, args.noise, weights_dict[7])
 ])
 
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
 scale = tf.placeholder(tf.float32, [len(m.layers)])
-model_train, stats = m.train(x=features)
+model_collect = m.collect(x=features)
+model_predict = m.predict(x=features, scale=scale)
 
-predict = tf.argmax(model_train, axis=1)
+predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
@@ -239,25 +216,6 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 weights = m.get_weights()
 
 ####################################
-
-loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
-params = tf.trainable_variables()
-
-loss_l2 = []
-for p in params:
-    loss_l2.append(tf.nn.l2_loss(p))
-loss_l2 = tf.reduce_sum(loss_l2)
-
-beta = 0.001 
-loss = loss_class + beta * loss_l2
-
-###############################################################
-
-grads = tf.gradients(loss, params)
-grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=args.lr, epsilon=args.eps).apply_gradients(grads_and_vars)
-
-###############################################################
 
 config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allow_growth=True
@@ -269,63 +227,34 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-np_stats_list = deque(maxlen=256)
+# probably want to use training data for this ...
+sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
-###############################################################
+scales = []
 
-for ii in range(0, args.epochs):
-    print('epoch %d/%d' % (ii, args.epochs))
+start = time.time()
+for jj in range(0, len(val_filenames), args.batch_size):
+    np_model_collect = sess.run(model_collect, feed_dict={handle: val_handle, learning_rate: 0.0})
+    scales.append(np_model_collect)
+    if (jj % (100 * args.batch_size) == 0):
+        img_per_sec = (jj + args.batch_size) / (time.time() - start)
+        p = "%d | img/s: %f" % (jj, img_per_sec)
+        print (p)
 
-    sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
+scales = np.ceil(np.average(scales, axis=0))
 
-    total_correct = 0
+##################################################################
+            
+sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
-    start = time.time()
-    for jj in range(0, len(train_filenames), args.batch_size):
-        [np_sum_correct, np_stats, _] = sess.run([sum_correct, stats, train], feed_dict={handle: train_handle, learning_rate: args.lr})
-        np_stats_list.append(np_stats)
+total_correct = 0
 
-        total_correct += np_sum_correct
-        if (jj % (100 * args.batch_size) == 0):
-            img_per_sec = (jj + args.batch_size) / (time.time() - start)
-            acc = total_correct / (jj + args.batch_size)
-            p = "%d | img/s: %f | acc: %f" % (jj, img_per_sec, acc)
-            print (p)
+for jj in range(0, len(val_filenames), args.batch_size):
+    np_sum_correct = sess.run(sum_correct, feed_dict={handle: val_handle, scale: scales, learning_rate: 0.0})
+    total_correct += np_sum_correct
 
-    ##################################################################
+acc = total_correct / len(val_filenames)
+print ("acc: %f" % (acc))
 
-    np_stats_dict = create_stats_dict(np_stats_list)
-    
-    ##################################################################
-
-    # qf = (self.g * self.f) / std
-    # qb = self.b - ((self.g * mean) / std)
-
-    weight_dict = sess.run(weights, feed_dict={})
-
-    for key in weight_dict.keys():
-        if key in np_stats_dict.keys():
-            (w, g, b) = weight_dict[key]
-            w = (g * w) / np_stats_dict[key]['var']
-            b = b - ((g * np_stats_dict[key]['mean']) / np_stats_dict[key]['var'])
-            weight_dict[key] = (w, b)
-
-    weight_dict['acc'] = acc
-    np.save(args.name, weight_dict)
-
-    ##################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+##################################################################
 
