@@ -55,16 +55,14 @@ class model:
         self.layers = layers
         
     def train(self, x):
-        mean_list = []
-        var_list = []
+        stats = {}
 
         y = x
         for layer in self.layers:
-            y, mean, var = layer.train(y)
-            mean_list.append(mean)
-            var_list.append(var)
+            y, stat = layer.train(y)
+            stats.update(stat)
 
-        return y, mean_list, var_list
+        return y, stats
     
     def collect(self, x):
         scale = []
@@ -148,7 +146,7 @@ class conv_block(layer):
         qpool = qpool + noise
         
         qpool = dequantize(qpool, -128, 127)
-        return qpool, [mean], [var]
+        return qpool, {self.layer_id: {'mean': mean, 'var': var}}
     
     def collect(self, x):
         # qf = (self.gamma * self.f) / std
@@ -182,11 +180,11 @@ class conv_block(layer):
         return qpool
         
     def get_weights(self):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        # qf, _ = quantize(self.f, -128, 127)
+        # qb, _ = quantize(self.b, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = (qf, qb)
+        weights_dict[self.layer_id] = [self.f, self.g, self.b]
         
         return weights_dict
         
@@ -213,7 +211,7 @@ class dense_block(layer):
         fc = tf.matmul(x, qw) 
         # qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qfc = quantize_and_dequantize(fc, -128, 127)
-        return qfc, [], []
+        return qfc, {}
     
     def collect(self, x):
         qw, _ = quantize(self.w, -128, 127)
@@ -234,11 +232,11 @@ class dense_block(layer):
         return qfc
         
     def get_weights(self):
-        qw, _ = quantize(self.w, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        # qw, _ = quantize(self.w, -128, 127)
+        # qb, _ = quantize(self.b, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = (qw, qb)
+        weights_dict[self.layer_id] = [self.w, self.b]
         
         return weights_dict
 
@@ -255,7 +253,7 @@ class avg_pool(layer):
     def train(self, x):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        return qpool, [], []
+        return qpool, {}
     
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
