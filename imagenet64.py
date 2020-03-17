@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=5)
+parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
@@ -224,6 +224,10 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
 ###############################################################
 
+weights = m.get_weights()
+
+####################################
+
 '''
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc1, labels=labels))
 correct = tf.equal(tf.argmax(fc1, axis=1), tf.argmax(labels, 1))
@@ -307,5 +311,15 @@ print ("acc: %f" % (acc))
 
 ##################################################################
 
+weight_dict = sess.run(weights, feed_dict={})
 
+for key in weight_dict.keys():
+    (w, b) = weight_dict[key]
+    weight_dict[key] = (w, b, scales[key])
+
+weight_dict['acc'] = acc
+
+np.save(args.name, weight_dict)
+
+##################################################################
 
