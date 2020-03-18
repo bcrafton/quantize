@@ -58,17 +58,17 @@ y_test = keras.utils.to_categorical(y_test, 10)
 weights_dict = np.load('cifar10_weights.npy', allow_pickle=True).item()
 
 m = model(layers=[
-conv_block(3,   32, 1, args.noise, weights=weights[0]),
-conv_block(32,  32, 2, args.noise, weights=weights[1]),
+conv_block(3,   32, 1, args.noise, weights=weights_dict[0]),
+conv_block(32,  32, 2, args.noise, weights=weights_dict[1]),
 
-conv_block(32,  64, 1, args.noise, weights=weights[2]),
-conv_block(64,  64, 2, args.noise, weights=weights[3]),
+conv_block(32,  64, 1, args.noise, weights=weights_dict[2]),
+conv_block(64,  64, 2, args.noise, weights=weights_dict[3]),
 
-conv_block(64,  128, 1, args.noise, weights=weights[4]),
-conv_block(128, 128, 2, args.noise, weights=weights[5]),
+conv_block(64,  128, 1, args.noise, weights=weights_dict[4]),
+conv_block(128, 128, 2, args.noise, weights=weights_dict[5]),
 
 avg_pool(4, 4),
-dense_block(128, 10, args.noise, weights=weights[7])
+dense_block(128, 10, args.noise, weights=weights_dict[7])
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -87,31 +87,6 @@ weights = m.get_weights()
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-
-####################################
-
-loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=model_train))
-
-params = tf.trainable_variables()
-
-####################################
-
-loss_l2 = []
-for p in params:
-    loss_l2.append(tf.nn.l2_loss(p))
-loss_l2 = tf.reduce_sum(loss_l2)
-
-# beta = 0.0   # 63%
-# beta = 0.01  # 10%
-beta = 0.001 # 70%
-# beta = 0.003 # 67%
-loss = loss_class + beta * loss_l2
-
-####################################
-
-grads = tf.gradients(loss, params)
-grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=args.lr, epsilon=args.eps).apply_gradients(grads_and_vars)
 
 ####################################
 
@@ -147,21 +122,8 @@ for jj in range(0, 10000, args.batch_size):
 
 acc = total_correct / 10000
 print ("acc: %f" % (acc))
-        
-####################################
-
-weight_dict = sess.run(weights, feed_dict={})
-
-for key in weight_dict.keys():
-    (w, b) = weight_dict[key]
-    weight_dict[key] = (w, b, scales[key])
-
-weight_dict['acc'] = acc
-
-np.save(args.name, weight_dict)
 
 ####################################
-
 
 
 
