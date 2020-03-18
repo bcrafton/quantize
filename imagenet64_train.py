@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=2)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-2)
 parser.add_argument('--eps', type=float, default=1.)
@@ -49,7 +49,7 @@ def create_stats_dict(stats_list):
     for layer in stats_dict.keys():
         for stat in stats_dict[layer].keys():
             if stat == 'var':
-                stats_dict[layer][stat] = np.mean(np.sqrt(stats_dict[layer][stat]), axis=0)
+                stats_dict[layer][stat] = np.mean(np.sqrt(np.array(stats_dict[layer][stat]) + 1e-3), axis=0)
             else:
                 stats_dict[layer][stat] = np.mean(stats_dict[layer][stat], axis=0)
 
