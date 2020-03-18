@@ -141,7 +141,9 @@ class conv_block(layer):
 
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        bn   = tf.nn.batch_normalization(x=conv, mean=mean, variance=var, offset=self.b, scale=self.g, variance_epsilon=1e-3)
+        # bn   = tf.nn.batch_normalization(x=conv, mean=mean, variance=var, offset=self.b, scale=self.g, variance_epsilon=1e-3)
+        std = tf.sqrt(var + 1e-3)
+        bn = ((conv - mean) / std) * self.g + self.b
 
         relu = tf.nn.relu(bn)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')

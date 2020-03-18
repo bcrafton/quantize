@@ -7,7 +7,7 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
-parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--batch_size', type=int, default=100)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--noise', type=float, default=0.)
@@ -82,24 +82,24 @@ y_test = keras.utils.to_categorical(y_test, 10)
 ####################################
 
 m = model(layers=[
-conv_block(3,   32, 1, args.noise),
-conv_block(32,  32, 2, args.noise),
+conv_block(3,   32, 1, args.noise, weights=None),
+conv_block(32,  32, 2, args.noise, weights=None),
 
-conv_block(32,  64, 1, args.noise),
-conv_block(64,  64, 2, args.noise),
+conv_block(32,  64, 1, args.noise, weights=None),
+conv_block(64,  64, 2, args.noise, weights=None),
 
-conv_block(64,  128, 1, args.noise),
-conv_block(128, 128, 2, args.noise),
+conv_block(64,  128, 1, args.noise, weights=None),
+conv_block(128, 128, 2, args.noise, weights=None),
 
 avg_pool(4, 4),
-dense_block(128, 10, args.noise)
+dense_block(128, 10, args.noise, weights=None)
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 scale = tf.placeholder(tf.float32, [len(m.layers)])
 
-model_train = m.train(x=x)
+model_train, stats = m.train(x=x)
 
 ####################################
 
@@ -145,27 +145,41 @@ sess.run(tf.global_variables_initializer())
 
 ####################################
 
+np_stats_list = deque(maxlen=256)
+
 for ii in range(args.epochs):
-    print ("epoch %d/%d" % (ii, args.epochs))
+    total_correct = 0
     for jj in range(0, 50000, args.batch_size):
         s = jj
         e = jj + args.batch_size
         xs = x_train[s:e]
         ys = y_train[s:e]
-        sess.run([train], feed_dict={x: xs, y: ys})
-        
-    weight_dict = sess.run(weights, feed_dict={})
+        [np_sum_correct, np_stats, _] = sess.run([sum_correct, stats, train], feed_dict={x: xs, y: ys})
+        np_stats_list.append(np_stats)
+        total_correct += np_sum_correct        
 
-    for key in weight_dict.keys():
-        if key in np_stats_dict.keys():
-            (w, g, b) = weight_dict[key]
-            w = (g * w) / np_stats_dict[key]['var']
-            b = b - ((g * np_stats_dict[key]['mean']) / np_stats_dict[key]['var'])
-            weight_dict[key] = (w, b)
+    acc = total_correct / 50000
+    p = "%d/%d | acc: %f" % (ii, args.epochs, acc)
+    print (p)
 
-    weight_dict['acc'] = acc
-    np.save(args.name, weight_dict)
+####################################
 
+np_stats_dict = create_stats_dict(np_stats_list)
 
+####################################
+
+weight_dict = sess.run(weights, feed_dict={})
+
+for key in weight_dict.keys():
+    if key in np_stats_dict.keys():
+        (w, g, b) = weight_dict[key]
+        w = (g * w) / np_stats_dict[key]['var']
+        b = b - ((g * np_stats_dict[key]['mean']) / np_stats_dict[key]['var'])
+        weight_dict[key] = (w, b)
+
+weight_dict['acc'] = acc
+np.save(args.name, weight_dict)
+
+####################################
 
 
