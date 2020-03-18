@@ -161,10 +161,10 @@ class conv_block(layer):
         return qpool, {self.layer_id: {'mean': mean, 'var': var}}
     
     def collect(self, x):
-        # qf = (self.gamma * self.f) / std
-        # qb = self.b - ((self.gamma * mean) / std)
-        qf, _ = quantize((self.f * self.g), -128, 127)
-        qb, _ = quantize((self.b - self.g), -128, 127)
+        # qf = (self.g * self.f) / std
+        # qb = self.b - ((self.g * mean) / std)
+        qf, _ = quantize(self.f, -128, 127)
+        qb, _ = quantize(self.b, -128, 127)
 
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
@@ -173,10 +173,10 @@ class conv_block(layer):
         return qpool, spool
 
     def predict(self, x, scale):
-        # qf = (self.gamma * self.f) / std
-        # qb = self.b - ((self.gamma * mean) / std)
-        qf, _ = quantize((self.f * self.g), -128, 127)
-        qb, _ = quantize((self.b - self.g), -128, 127)
+        # qf = (self.g * self.f) / std
+        # qb = self.b - ((self.g * mean) / std)
+        qf, _ = quantize(self.f, -128, 127)
+        qb, _ = quantize(self.b, -128, 127)
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
@@ -196,7 +196,7 @@ class conv_block(layer):
         # qb, _ = quantize(self.b, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = [self.f, self.g, self.b]
+        weights_dict[self.layer_id] = (self.f, self.g, self.b)
         
         return weights_dict
         
@@ -259,7 +259,7 @@ class dense_block(layer):
         # qb, _ = quantize(self.b, -128, 127)
     
         weights_dict = {}
-        weights_dict[self.layer_id] = [self.w, self.b]
+        weights_dict[self.layer_id] = (self.w, self.b)
         
         return weights_dict
 
