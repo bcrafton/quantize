@@ -6,11 +6,11 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
-parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--epochs', type=int, default=5)
+parser.add_argument('--batch_size', type=int, default=100)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
-parser.add_argument('--noise', type=float, default=2.)
+parser.add_argument('--noise', type=float, default=0.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--init', type=str, default="glorot_uniform")
 parser.add_argument('--name', type=str, default="cifar10_weights")
@@ -108,7 +108,7 @@ for jj in range(0, 50000, args.batch_size):
     
 # this needs to be ceil for cases where (scale < 1), like avg_pool.
 scales = np.ceil(np.average(scales, axis=0))
-    
+
 ####################################
 
 total_correct = 0
