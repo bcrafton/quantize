@@ -8,9 +8,9 @@ import sys
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--eps', type=float, default=1.)
-parser.add_argument('--noise', type=float, default=2.)
+parser.add_argument('--noise', type=float, default=0.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--init', type=str, default="glorot_uniform")
 parser.add_argument('--name', type=str, default="cifar10_weights")
@@ -65,8 +65,8 @@ conv_block(64,  64, 2, noise=args.noise),
 conv_block(64,  128, 1, noise=args.noise),
 conv_block(128, 128, 2, noise=args.noise),
 
-avg_pool(4, 4),
-dense_block(128, 10, noise=args.noise)
+# avg_pool(4, 4),
+dense_block(2048, 10, noise=args.noise)
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -104,7 +104,7 @@ loss_l2 = tf.reduce_sum(loss_l2)
 # beta = 0.01  # 10%
 beta = 0.001 # 70%
 # beta = 0.003 # 67%
-loss = loss_class + beta * loss_l2
+loss = loss_class # + beta * loss_l2
 
 ####################################
 
@@ -143,6 +143,7 @@ for jj in range(0, 50000, args.batch_size):
     
 # this needs to be ceil for cases where (scale < 1), like avg_pool.
 scales = np.ceil(np.average(scales, axis=0))
+print (scales)
     
 ####################################
 
