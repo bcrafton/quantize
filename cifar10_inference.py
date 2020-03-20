@@ -118,11 +118,11 @@ for key in sorted(results.keys()):
         example_results = merge_dicts(layer_results[layer])
         sigma_index = np.where(var == sigma)[0][0]
         y_std[skip][cards][sigma_index][layer] = np.mean(example_results['std'])
-        acc[skip][cards][sigma_index] = layer_results['acc']
 
 ####################################
 
 y_std = np.reshape(y_std, (2 * 2 * len(var), num_layers))
+accs = []
 
 for std in y_std:
     total_correct = 0
@@ -135,10 +135,27 @@ for std in y_std:
         total_correct += np_sum_correct
 
     acc = total_correct / 10000
-    # print (std)
+    accs.append(acc)
     print ("acc: %f" % (acc))
         
+acc = np.reshape(accs, (2, 2, len(var)))
+        
 ####################################
+
+results['acc_tf'] = acc
+np.save('results_tf', results)
+
+####################################
+
+
+
+
+
+
+
+
+
+
 
 
 
