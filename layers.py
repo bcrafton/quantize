@@ -78,16 +78,16 @@ class model:
             scale.append(s)
         return scale
 
-    def predict(self, x, scale):
+    def predict(self, x, scale, noise):
         y = x
         for l in range(len(self.layers)):
-            y = self.layers[l].predict(y, scale[l])
+            y = self.layers[l].predict(y, scale[l], noise=noise)
         return y
         
-    def inference(self, x):
+    def inference(self, x, noise):
         y = x
         for layer in self.layers:
-            y = layer.inference(y)
+            y = layer.inference(y, noise=noise)
         return y
         
     def get_weights(self):
@@ -119,14 +119,13 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p, noise, weights=None):
+    def __init__(self, f1, f2, p, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        self.noise = noise
         
         if weights:
             f, b, q = weights['f'], weights['b'], weights['q']
@@ -147,14 +146,6 @@ class conv_block(layer):
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
         qpool = quantize_and_dequantize(pool, -128, 127)
-        
-        # TODO: quantize followed by dequantize does not work.
-        # qpool, _ = quantize(pool, -128, 127)
-        # noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=self.noise)
-        # noise = tf.clip_by_value(noise, 0., 1e6)
-        # qpool = qpool + noise
-        # qpool = dequantize(qpool, -128, 127)
-        
         return qpool
     
     def collect(self, x):
@@ -167,7 +158,7 @@ class conv_block(layer):
         qpool, spool = quantize(pool, -128, 127)
         return qpool, spool
 
-    def predict(self, x, scale):
+    def predict(self, x, scale, noise):
         qf, _ = quantize(self.f, -128, 127)
         qb, _ = quantize(self.b, -128, 127)
         
@@ -175,15 +166,15 @@ class conv_block(layer):
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         qpool = quantize_predict(pool, scale, -128, 127)
-        noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=self.noise)
-        noise = tf.clip_by_value(noise, 0., 1e6)
-        noise = tf.floor(noise)
-        qpool = qpool + noise
+        _noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=noise[self.layer_id])
+        _noise = tf.clip_by_value(_noise, 0., 1e6)
+        _noise = tf.floor(_noise)
+        qpool = qpool + _noise
 
         return qpool
         
-    def inference(self, x):
-        return self.predict(x=x, scale=self.q)
+    def inference(self, x, noise):
+        return self.predict(x=x, scale=self.q, noise=noise)
         
     def get_weights(self):
         qf, _ = quantize(self.f, -128, 127)
@@ -197,13 +188,12 @@ class conv_block(layer):
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize, noise, weights=None):
+    def __init__(self, isize, osize, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
     
         self.isize = isize
         self.osize = osize
-        self.noise = noise
         
         if weights:
             w, b, q = weights['w'], weights['b'], weights['q']
@@ -233,7 +223,7 @@ class dense_block(layer):
         qfc, sfc = quantize(fc, -128, 127)
         return qfc, sfc
 
-    def predict(self, x, scale):
+    def predict(self, x, scale, noise):
         qw, _ = quantize(self.w, -128, 127)
         qb, _ = quantize(self.b, -128, 127)
         
@@ -242,8 +232,8 @@ class dense_block(layer):
         qfc = quantize_predict(fc, scale, -128, 127)
         return qfc
         
-    def inference(self, x):
-        return self.predict(x=x, scale=self.q)
+    def inference(self, x, noise):
+        return self.predict(x=x, scale=self.q, noise=noise)
         
     def get_weights(self):
         qw, _ = quantize(self.w, -128, 127)
@@ -279,13 +269,13 @@ class avg_pool(layer):
         qpool, spool = quantize(pool, -128, 127)
         return qpool, spool
 
-    def predict(self, x, scale):
+    def predict(self, x, scale, noise):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = quantize_predict(pool, scale, -128, 127) # this only works because we use np.ceil(scales)
         return qpool
         
-    def inference(self, x):
-        return self.predict(x=x, scale=self.q)
+    def inference(self, x, noise):
+        return self.predict(x=x, scale=self.q, noise=noise)
         
     def get_weights(self):    
         weights_dict = {}
