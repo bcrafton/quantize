@@ -113,8 +113,6 @@ class conv_block(layer):
         self.noise = noise
         
     def train(self, x):
-        # qf = tf.quantization.quantize_and_dequantize(input=self.f, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        # qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qf = quantize_and_dequantize(self.f, -128, 127)
         qb = quantize_and_dequantize(self.b, -128, 127)
         
@@ -169,14 +167,11 @@ class dense_block(layer):
         self.noise = noise
         
     def train(self, x):
-        # qw = tf.quantization.quantize_and_dequantize(input=self.w, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
-        # qb = tf.quantization.quantize_and_dequantize(input=self.b, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qw = quantize_and_dequantize(self.w, -128, 127)
         qb = quantize_and_dequantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) # + qb
-        # qfc = tf.quantization.quantize_and_dequantize(input=fc, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
         qfc = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
@@ -219,7 +214,7 @@ class avg_pool(layer):
         
     def train(self, x):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = tf.quantization.quantize_and_dequantize(input=pool, input_min=0, input_max=0, signed_input=True, num_bits=8, range_given=False)
+        qpool = quantize_and_dequantize(pool, -128, 127)
         return qpool
     
     def collect(self, x):
