@@ -6,7 +6,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=20)
+parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=5e-4)
 parser.add_argument('--eps', type=float, default=1.)
@@ -172,8 +172,7 @@ print ("acc: %f" % (acc))
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
-    (w, b) = weight_dict[key]
-    weight_dict[key] = (w, b, scales[key])
+    weight_dict[key]['q'] = scales[key]
 
 weight_dict['acc'] = acc
 
