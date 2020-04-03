@@ -74,7 +74,7 @@ dense_block(256, 10, noise=args.noise, weights=weights[7])
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 
-model_predict = m.inference(x=x)
+model_predict, out = m.inference(x=x)
 
 ####################################
 
@@ -91,19 +91,50 @@ sess.run(tf.global_variables_initializer())
 
 ####################################
 
+layer_out = {}
+
 total_correct = 0
-for jj in range(0, 10000, args.batch_size):
+for jj in range(0, 100, args.batch_size):
     s = jj
     e = jj + args.batch_size
     xs = x_test[s:e]
     ys = y_test[s:e]
-    np_sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys})
+    
+    [np_sum_correct, np_out] = sess.run([sum_correct, out], feed_dict={x: xs, y: ys})
     total_correct += np_sum_correct
 
-acc = total_correct / 10000
+    for layer in range(len(np_out)):
+        if layer in layer_out.keys():
+            layer_out[layer].append(np_out[layer])
+        else:
+            layer_out[layer] = [np_out[layer]]
+
+acc = total_correct / 100
 print ("acc: %f" % (acc))
         
 ####################################
+
+for layer in layer_out.keys():
+    layer_out[layer] = np.concatenate(layer_out[layer], axis=0)
+
+####################################
+
+np.save('cifar_out', layer_out)
+
+####################################
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

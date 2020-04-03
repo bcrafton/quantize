@@ -86,9 +86,11 @@ class model:
         
     def inference(self, x):
         y = x
+        ys = []
         for layer in self.layers:
             y = layer.inference(y)
-        return y
+            ys.append(y)
+        return y, ys
         
     def get_weights(self):
         weights_dict = {}
