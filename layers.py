@@ -88,8 +88,8 @@ class model:
         y = x
         ys = []
         for layer in self.layers:
-            y = layer.inference(y)
             ys.append(y)
+            y = layer.inference(y)
         return y, ys
         
     def get_weights(self):
