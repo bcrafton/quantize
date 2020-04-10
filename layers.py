@@ -159,7 +159,7 @@ class conv_block(layer):
         qpool, spool = quantize(pool, -128, 127)
 
         # qpool = tf.Print(qpool, [tf.reduce_max(pool), tf.reduce_mean(qpool)], message='', summarize=1000)
-        qpool = tf.Print(qpool, [self.layer_id, spool, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
+        # qpool = tf.Print(qpool, [self.layer_id, spool, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
         return qpool, [spool, std, mean]
 
     def predict(self, x, scale):
@@ -172,7 +172,7 @@ class conv_block(layer):
         
         qpool = quantize_predict(pool, scale, -128, 127)
 
-        qpool = tf.Print(qpool, [self.layer_id, scale, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
+        # qpool = tf.Print(qpool, [self.layer_id, scale, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
         return qpool
         
     def inference(self, x):

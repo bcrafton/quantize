@@ -71,7 +71,6 @@ dense_block(256, 10, noise=args.noise)
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
-scale = tf.placeholder(tf.float32, [len(m.layers)])
 
 model_train = m.train(x=x)
 model_predict, model_collect = m.collect(x=x)
@@ -174,7 +173,7 @@ for key in weight_dict.keys():
         assert (np.shape(weight_dict[key]['b']) == np.shape(scales[key][1]))
         weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
         weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
-        print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
+        # print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
