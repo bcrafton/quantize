@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
@@ -102,7 +102,7 @@ def extract_fn(record):
 
 ###############################################################
 
-train_filenames = get_train_filenames()
+train_filenames = get_train_filenames()[0:50000]
 val_filenames = get_val_filenames()
 
 filename = tf.placeholder(tf.string, shape=[None])
@@ -235,9 +235,35 @@ for ii in range(0, args.epochs):
 
 ##################################################################
 
+sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
+
+scales = []
+total_correct = 0
+start = time.time()
+for jj in range(0, len(train_filenames), args.batch_size):
+    [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={handle: train_handle, learning_rate: 0.})
+    total_correct += np_sum_correct
+
+    if len(scales):
+        for i, params in enumerate(np_model_collect):
+            for j, param in enumerate(params):
+                scales[i][j] += param
+    else:
+        for params in np_model_collect:
+            scales.append(params)
+
+    if (jj % (100 * args.batch_size) == 0):
+        acc = total_correct / (jj + args.batch_size)
+        img_per_sec = (jj + args.batch_size) / (time.time() - start)
+        p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
+        print (p)
+
+for i in range(len(scales)):
+    for j in range(len(scales[i])):
+        scales[i][j] = scales[i][j] / (len(train_filenames) / args.batch_size)
 
 ##################################################################
-'''
+
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
@@ -246,10 +272,17 @@ for key in weight_dict.keys():
         assert (np.shape(weight_dict[key]['b']) == np.shape(scales[key][1]))
         weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
         weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
-        print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
+        # print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
-'''
+
 ##################################################################
+
+
+
+
+
+
+
 
