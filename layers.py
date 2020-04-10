@@ -98,12 +98,11 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p, noise, weights=None):
+    def __init__(self, shape, p, noise, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
-        self.f1 = f1
-        self.f2 = f2
+        self.k, _, self.f1, self.f2 = shape
         self.p = p
         self.noise = noise
         
@@ -113,7 +112,7 @@ class conv_block(layer):
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
             self.q = q
         else:
-            self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
+            self.f = tf.Variable(init_filters(size=[self.k,self.k,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
             self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
             self.q = None
@@ -177,7 +176,7 @@ class conv_block(layer):
         
 #############
 
-class res_block(layer):
+class res_block1(layer):
     def __init__(self, f1, f2, p, noise, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
@@ -189,33 +188,35 @@ class res_block(layer):
         
         if weights:
             self.q = weights[self.layer_id]['q']
-            self.conv1 = conv_block(f1, f2, p, noise=None, weights=weights)
-            self.conv2 = conv_block(f2, f2, 1, noise=None, weights=weights)
+            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights)
         else:
-            self.conv1 = conv_block(f1, f2, p, noise=None, weights=None)
-            self.conv2 = conv_block(f2, f2, 1, noise=None, weights=None)
+            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None)
 
     def train(self, x):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
-        return y2
+        y3 = quantize_and_dequantize(y2 + x)
+        return y3
     
     def collect(self, x):
         y1, params1 = self.conv1.collect(x)
         y2, params2 = self.conv2.collect(y1)
-        y3, s3 = quantize(y2, -128, 127)
+        y3, s3 = quantize(y2 + x, -128, 127)
         params3 = {self.layer_id: {'scale': s3}}
         
         params = {}
         params.update(params1)
         params.update(params2)
         params.update(params3)
-        return y2, params
+        return y3, params
 
     def predict(self, x):
         y1 = self.conv1.predict(x)
         y2 = self.conv2.predict(y1)
-        return y2
+        y3 = quantize_predict(y2 + x, self.q, -128, 127)
+        return y3
         
     def get_weights(self):
         weights_dict = {}
@@ -227,6 +228,68 @@ class res_block(layer):
         weights_dict[self.layer_id] = {}
         return weights_dict
         
+#############
+
+class res_block2(layer):
+    def __init__(self, f1, f2, p, noise, weights=None):
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+        
+        self.f1 = f1
+        self.f2 = f2
+        self.p = p
+        self.noise = noise
+        
+        if weights:
+            self.q = weights[self.layer_id]['q']
+            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights)
+            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=weights)
+        else:
+            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None)
+            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None)
+
+    def train(self, x):
+        y1 = self.conv1.train(x)
+        y2 = self.conv2.train(y1)
+        y3 = self.conv3.train(x)
+        y4 = quantize_and_dequantize(y2 + y3)
+        return y4
+    
+    def collect(self, x):
+        y1, params1 = self.conv1.collect(x)
+        y2, params2 = self.conv2.collect(y1)
+        y3, params3 = self.conv2.collect(x)
+        y4, s4 = quantize(y2 + y3, -128, 127)
+        params4 = {self.layer_id: {'scale': s4}}
+        
+        params = {}
+        params.update(params1)
+        params.update(params2)
+        params.update(params3)
+        params.update(params4)
+        return y4, params
+
+    def predict(self, x):
+        y1 = self.conv1.predict(x)
+        y2 = self.conv2.predict(y1)
+        y3 = self.conv2.predict(x)
+        y4 = quantize_predict(y2 + y3, self.q, -128, 127)
+        return y4
+        
+    def get_weights(self):
+        weights_dict = {}
+        weights1 = self.conv1.get_weights()
+        weights2 = self.conv2.get_weights()
+        weights3 = self.conv2.get_weights()
+        
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
+        weights_dict.update(weights3)
+        weights_dict[self.layer_id] = {}
+        return weights_dict
+
 #############
 
 class dense_block(layer):
