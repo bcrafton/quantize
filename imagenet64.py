@@ -102,7 +102,7 @@ def extract_fn(record):
 
 ###############################################################
 
-train_filenames = get_train_filenames()[0:50000]
+train_filenames = get_train_filenames()
 val_filenames = get_val_filenames()
 
 filename = tf.placeholder(tf.string, shape=[None])
