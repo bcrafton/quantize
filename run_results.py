@@ -15,8 +15,8 @@ cmd_args = parser.parse_args()
 
 ##############################################
 
-num_gpus = 4
-counter = 0
+num_gpus = 5
+counter = 1
 
 def run_command(param):
     global num_gpus, counter
@@ -34,7 +34,7 @@ def run_command(param):
             param['noise']
             )
              
-    cmd = "python36 %s --gpu %d --epochs %d --batch_size %d --lr %f --eps %f --noise %f --name %s" % (
+    cmd = "python3 %s --gpu %d --epochs %d --batch_size %d --lr %f --eps %f --noise %f --name %s" % (
            param['benchmark'], 
            gpu, 
            param['epochs'], 

@@ -26,7 +26,7 @@ def get_perms(param):
 
 ################################################
 
-imagenet64 = {'benchmark':'imagenet64_res.py', 'epochs':20, 'batch_size':[50], 'lr':[0.01, 0.001, 0.0001], 'eps':1., 'noise':0.}
+imagenet64 = {'benchmark':'imagenet64_res.py', 'epochs':5, 'batch_size':[50], 'lr':[0.01, 0.001, 0.0001], 'eps':1., 'noise':0.}
 
 ################################################
 
