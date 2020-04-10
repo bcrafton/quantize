@@ -174,7 +174,7 @@ dense_block(1024, 1000, noise=args.noise, weights=weights[7])
 
 learning_rate = tf.placeholder(tf.float32, shape=())
 
-model_predict = m.inference(x=features)
+model_predict = m.predict(x=features)
 
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
