@@ -26,11 +26,11 @@ def get_perms(param):
 
 ################################################
 
-cifar10 = {'benchmark':'cifar10.py', 'epochs':20, 'batch_size':[50, 100], 'lr':[0.001, 0.0001], 'eps':1., 'noise':[1.0, 2.0, 3.0]}
+imagenet64 = {'benchmark':'imagenet64_res.py', 'epochs':20, 'batch_size':[50], 'lr':[0.01, 0.001, 0.0001], 'eps':1., 'noise':0.}
 
 ################################################
 
-params = [cifar10]
+params = [imagenet64]
 
 ################################################
 
