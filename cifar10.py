@@ -138,7 +138,7 @@ for ii in range(args.epochs):
 
 ####################################
 
-scales = []
+scales = None
 total_correct = 0
 for jj in range(0, 50000, args.batch_size):
     s = jj
@@ -148,32 +148,29 @@ for jj in range(0, 50000, args.batch_size):
     [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={x: xs, y: ys})
     total_correct += np_sum_correct
     
-    if len(scales):
-        for i, params in enumerate(np_model_collect):
-            for j, param in enumerate(params):
-                scales[i][j] += param
+    if scales:
+        for layer in np_model_collect.keys():
+            for param in np_model_collect[layer].keys():
+                scales[layer][param] += np_model_collect[layer][param]
     else:
-        for params in np_model_collect:
-            scales.append(params)
+        scales = np_model_collect
 
 acc = total_correct / 50000
 print ("collect acc: %f" % (acc))
 
-for i in range(len(scales)):
-    for j in range(len(scales[i])):
-        scales[i][j] = scales[i][j] / (50000 / args.batch_size)
+for layer in scales.keys():
+    for param in scales[layer].keys():
+        scales[layer][param] = scales[layer][param] / (50000 / args.batch_size)
 
 ####################################
 
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
-    weight_dict[key]['q'] = np.ceil(scales[key][0])
-    if len(scales[key]) == 3:
-        assert (np.shape(weight_dict[key]['b']) == np.shape(scales[key][1]))
-        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
-        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
-        # print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
+    weight_dict[key]['q'] = np.ceil(scales[key]['scale'])
+    if len(scales[key].keys()) == 3:
+        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key]['std'])
+        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key]['std']) * scales[key]['mean']
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)

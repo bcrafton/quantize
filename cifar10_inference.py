@@ -58,17 +58,17 @@ y_test = keras.utils.to_categorical(y_test, 10)
 weights = np.load('cifar10_weights.npy', allow_pickle=True).item()
 
 m = model(layers=[
-conv_block(3,   64, 1, noise=args.noise, weights=weights[0]),
-conv_block(64,  64, 2, noise=args.noise, weights=weights[1]),
+conv_block(3,   64, 1, noise=args.noise, weights=weights),
+conv_block(64,  64, 2, noise=args.noise, weights=weights),
 
-conv_block(64,  128, 1, noise=args.noise, weights=weights[2]),
-conv_block(128, 128, 2, noise=args.noise, weights=weights[3]),
+conv_block(64,  128, 1, noise=args.noise, weights=weights),
+conv_block(128, 128, 2, noise=args.noise, weights=weights),
 
-conv_block(128, 256, 1, noise=args.noise, weights=weights[4]),
-conv_block(256, 256, 2, noise=args.noise, weights=weights[5]),
+conv_block(128, 256, 1, noise=args.noise, weights=weights),
+conv_block(256, 256, 2, noise=args.noise, weights=weights),
 
-avg_pool(4, 4, weights=weights[6]),
-dense_block(256, 10, noise=args.noise, weights=weights[7])
+avg_pool(4, 4, weights=weights),
+dense_block(256, 10, noise=args.noise, weights=weights)
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
