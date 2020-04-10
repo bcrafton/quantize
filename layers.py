@@ -61,7 +61,7 @@ class model:
         for layer in self.layers:
             y, s = layer.collect(y)
             scale.append(s)
-        return scale
+        return y, scale
 
     def predict(self, x, scale):
         y = x
@@ -142,37 +142,45 @@ class conv_block(layer):
         return qpool
     
     def collect(self, x):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        mean = tf.reduce_mean(conv, axis=[0,1,2])
+        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+        std = tf.sqrt(var + 1e-3)
+        fold_f = (self.g * self.f) / std
+        fold_b = self.b - ((self.g * mean) / std)
+        # qf = quantize_and_dequantize(fold_f, -128, 127)
+        qf, sf = quantize(fold_f, -128, 127)
+        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+
         qpool, spool = quantize(pool, -128, 127)
-        return qpool, spool
+
+        # qpool = tf.Print(qpool, [tf.reduce_max(pool), tf.reduce_mean(qpool)], message='', summarize=1000)
+        qpool = tf.Print(qpool, [self.layer_id, spool, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
+        return qpool, [spool, std, mean]
 
     def predict(self, x, scale):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        qf, sf = quantize(self.f, -128, 127)
+        qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+        
         qpool = quantize_predict(pool, scale, -128, 127)
-        qpool = qpool
 
+        qpool = tf.Print(qpool, [self.layer_id, scale, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
         return qpool
         
     def inference(self, x):
         return self.predict(x=x, scale=self.q)
         
     def get_weights(self):
-        qf, _ = quantize(self.f, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
-    
         weights_dict = {}
-        weights_dict[self.layer_id] = {'f': qf, 'b': qb}
-        
+        weights_dict[self.layer_id] = {'f': self.f, 'g': self.g, 'b': self.b}
         return weights_dict
         
 #############
@@ -212,7 +220,7 @@ class dense_block(layer):
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) # + qb
         qfc, sfc = quantize(fc, -128, 127)
-        return qfc, sfc
+        return qfc, [sfc]
 
     def predict(self, x, scale):
         qw, _ = quantize(self.w, -128, 127)
@@ -258,7 +266,7 @@ class avg_pool(layer):
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return qpool, spool
+        return qpool, [spool]
 
     def predict(self, x, scale):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
