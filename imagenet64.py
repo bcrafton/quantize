@@ -172,7 +172,11 @@ dense_block(1024, 1000, noise=args.noise)
 learning_rate = tf.placeholder(tf.float32, shape=())
 
 model_train = m.train(x=features)
-model_predict, model_collect = m.collect(x=x)
+model_predict, model_collect = m.collect(x=features)
+
+train_predict = tf.argmax(model_train, axis=1)
+train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
+train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
 
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
