@@ -135,26 +135,25 @@ class conv_block(layer):
             self.q = q
         else:
             self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-            self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, trainable=False)
+            self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
+            self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
             self.q = None
 
     def train(self, x):
-        qf = quantize_and_dequantize(self.f, -128, 127)
-        qb = quantize_and_dequantize(self.b, -128, 127)
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        mean = tf.reduce_mean(conv, axis=[0,1,2])
+        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+        std = tf.sqrt(var + 1e-3)
+        fold_f = (self.g * self.f) / std
+        fold_b = self.b - ((self.g * mean) / std)
+        qf = quantize_and_dequantize(fold_f, -128, 127)
+        # qb = quantize_and_dequantize(fold_b, -128, 127) 
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') # + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
         qpool = quantize_and_dequantize(pool, -128, 127)
-        
-        # TODO: quantize followed by dequantize does not work.
-        # qpool, _ = quantize(pool, -128, 127)
-        # noise = tf.random.normal(shape=tf.shape(qpool), mean=0., stddev=self.noise)
-        # noise = tf.clip_by_value(noise, 0., 1e6)
-        # qpool = qpool + noise
-        # qpool = dequantize(qpool, -128, 127)
-        
         return qpool
     
     def collect(self, x):
