@@ -137,19 +137,19 @@ val_iterator = val_dataset.make_initializable_iterator()
 ###############################################################
 
 m = model(layers=[
-conv_block(3,   64, 1, noise=None),
+conv_block((3,3,3,64), 1, noise=None),
 
-res_block1(64,   64, 2, noise=None),
-res_block2(64,   64, 1, noise=None),
+res_block2(64,   64, 2, noise=None),
+res_block1(64,   64, 1, noise=None),
 
-res_block1(64,   128, 2, noise=None),
-res_block2(128,  128, 1, noise=None),
+res_block2(64,   128, 2, noise=None),
+res_block1(128,  128, 1, noise=None),
 
-res_block1(128,  256, 2, noise=None),
-res_block2(256,  256, 1, noise=None),
+res_block2(128,  256, 2, noise=None),
+res_block1(256,  256, 1, noise=None),
 
-res_block1(256,  512, 2, noise=None),
-res_block2(512,  512, 1, noise=None),
+res_block2(256,  512, 2, noise=None),
+res_block1(512,  512, 1, noise=None),
 
 avg_pool(4, 4),
 dense_block(512, 1000, noise=None)
