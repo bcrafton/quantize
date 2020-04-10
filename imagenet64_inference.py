@@ -137,7 +137,7 @@ val_iterator = val_dataset.make_initializable_iterator()
 ###############################################################
 weights = np.load('imagenet_weights.npy', allow_pickle=True).item()
 
-
+'''
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise, weights=weights),
 conv_block(64,   64, 2, noise=args.noise, weights=weights),
@@ -169,7 +169,7 @@ conv_block(512,  1024, 1, noise=args.noise, weights=weights[5]),
 avg_pool(4, 4, weights=weights[6]),
 dense_block(1024, 1000, noise=args.noise, weights=weights[7])
 ])
-'''
+
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())

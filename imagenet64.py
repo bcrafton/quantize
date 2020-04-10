@@ -245,13 +245,12 @@ for jj in range(0, len(train_filenames), args.batch_size):
     [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={handle: train_handle, learning_rate: 0.})
     total_correct += np_sum_correct
 
-    if len(scales):
-        for i, params in enumerate(np_model_collect):
-            for j, param in enumerate(params):
-                scales[i][j] += param
+    if scales:
+        for layer in np_model_collect.keys():
+            for param in np_model_collect[layer].keys():
+                scales[layer][param] += np_model_collect[layer][param]
     else:
-        for params in np_model_collect:
-            scales.append(params)
+        scales = np_model_collect
 
     if (jj % (100 * args.batch_size) == 0):
         acc = total_correct / (jj + args.batch_size)
@@ -259,9 +258,9 @@ for jj in range(0, len(train_filenames), args.batch_size):
         p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
         print (p)
 
-for i in range(len(scales)):
-    for j in range(len(scales[i])):
-        scales[i][j] = scales[i][j] / (len(train_filenames) / args.batch_size)
+for layer in scales.keys():
+    for param in scales[layer].keys():
+        scales[layer][param] = scales[layer][param] / (50000 / args.batch_size)
 
 ##################################################################
 
