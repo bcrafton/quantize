@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--eps', type=float, default=1.)
@@ -102,7 +102,7 @@ def extract_fn(record):
 
 ###############################################################
 
-train_filenames = get_train_filenames()
+train_filenames = get_train_filenames()[0:50000]
 val_filenames = get_val_filenames()
 
 filename = tf.placeholder(tf.string, shape=[None])
@@ -136,23 +136,25 @@ val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
 
+weights = np.load('imagenet_weights.npy', allow_pickle=True).item()
+
 m = model(layers=[
-conv_block((3,3,3,64), 1, noise=None),
+conv_block((3,3,3,64), 1, noise=None, weights=weights),
 
-res_block2(64,   64, 2, noise=None),
-res_block1(64,   64, 1, noise=None),
+res_block2(64,   64, 2, noise=None, weights=weights),
+res_block1(64,   64, 1, noise=None, weights=weights),
 
-res_block2(64,   128, 2, noise=None),
-res_block1(128,  128, 1, noise=None),
+res_block2(64,   128, 2, noise=None, weights=weights),
+res_block1(128,  128, 1, noise=None, weights=weights),
 
-res_block2(128,  256, 2, noise=None),
-res_block1(256,  256, 1, noise=None),
+res_block2(128,  256, 2, noise=None, weights=weights),
+res_block1(256,  256, 1, noise=None, weights=weights),
 
-res_block2(256,  512, 2, noise=None),
-res_block1(512,  512, 1, noise=None),
+res_block2(256,  512, 2, noise=None, weights=weights),
+res_block1(512,  512, 1, noise=None, weights=weights),
 
-avg_pool(4, 4),
-dense_block(512, 1000, noise=None)
+avg_pool(4, 4, weights=weights),
+dense_block(512, 1000, noise=None, weights=weights)
 ])
 
 '''
@@ -168,43 +170,16 @@ avg_pool(4, 4),
 dense_block(1024, 1000, noise=None)
 ])
 '''
+
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
 
-model_train = m.train(x=features)
-model_predict, model_collect = m.collect(x=features)
-
-train_predict = tf.argmax(model_train, axis=1)
-train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
-train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
+model_predict = m.predict(x=features)
 
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-
-###############################################################
-
-weights = m.get_weights()
-
-####################################
-
-loss_class = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
-params = tf.trainable_variables()
-
-loss_l2 = []
-for p in params:
-    loss_l2.append(tf.nn.l2_loss(p))
-loss_l2 = tf.reduce_sum(loss_l2)
-
-beta = 0.001 
-loss = loss_class # + beta * loss_l2
-
-###############################################################
-
-grads = tf.gradients(loss, params)
-grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=args.eps).apply_gradients(grads_and_vars)
 
 ###############################################################
 
@@ -218,62 +193,18 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-for ii in range(0, args.epochs):
-    print('epoch %d/%d' % (ii, args.epochs))
+sess.run(val_iterator.initializer, feed_dict={filename: val_filenames})
 
-    sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
-
-    total_correct = 0
-    start = time.time()
-    for jj in range(0, len(train_filenames), args.batch_size):
-        [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
-        total_correct += np_sum_correct
-        if (jj % (100 * args.batch_size) == 0):
-            acc = total_correct / (jj + args.batch_size)
-            img_per_sec = (jj + args.batch_size) / (time.time() - start)
-            p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
-            print (p)
-
-##################################################################
-
-sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
-
-scales = []
 total_correct = 0
 start = time.time()
-for jj in range(0, len(train_filenames), args.batch_size):
-    [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={handle: train_handle, learning_rate: 0.})
+for jj in range(0, len(val_filenames), args.batch_size):
+    [np_sum_correct] = sess.run([sum_correct], feed_dict={handle: val_handle, learning_rate: 0.})
     total_correct += np_sum_correct
-
-    if scales:
-        for layer in np_model_collect.keys():
-            for param in np_model_collect[layer].keys():
-                scales[layer][param] += np_model_collect[layer][param]
-    else:
-        scales = np_model_collect
-
     if (jj % (100 * args.batch_size) == 0):
         acc = total_correct / (jj + args.batch_size)
         img_per_sec = (jj + args.batch_size) / (time.time() - start)
         p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
         print (p)
-
-for layer in scales.keys():
-    for param in scales[layer].keys():
-        scales[layer][param] = scales[layer][param] / (50000 / args.batch_size)
-
-##################################################################
-
-weight_dict = sess.run(weights, feed_dict={})
-
-for key in weight_dict.keys():
-    weight_dict[key]['q'] = np.ceil(scales[key]['scale'])
-    if len(scales[key].keys()) == 3:
-        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key]['std'])
-        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key]['std']) * scales[key]['mean']
-
-weight_dict['acc'] = acc
-np.save(args.name, weight_dict)
 
 ##################################################################
 
