@@ -135,7 +135,7 @@ train_iterator = train_dataset.make_initializable_iterator()
 val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
-
+'''
 m = model(layers=[
 conv_block(3,    64, 1, noise=args.noise),
 conv_block(64,   64, 2, noise=args.noise),
@@ -167,7 +167,7 @@ conv_block(512,  1024, 1, noise=args.noise),
 avg_pool(4, 4),
 dense_block(1024, 1000, noise=args.noise)
 ])
-'''
+
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
