@@ -268,12 +268,10 @@ for i in range(len(scales)):
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
-    weight_dict[key]['q'] = np.ceil(scales[key][0])
-    if len(scales[key]) == 3:
-        assert (np.shape(weight_dict[key]['b']) == np.shape(scales[key][1]))
-        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
-        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
-        # print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
+    weight_dict[key]['q'] = np.ceil(scales[key]['scale'])
+    if len(scales[key].keys()) == 3:
+        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key]['std'])
+        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key]['std']) * scales[key]['mean']
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
