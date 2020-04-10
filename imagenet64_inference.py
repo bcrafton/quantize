@@ -137,25 +137,25 @@ val_iterator = val_dataset.make_initializable_iterator()
 ###############################################################
 weights = np.load('imagenet_weights.npy', allow_pickle=True).item()
 
-'''
+
 m = model(layers=[
-conv_block(3,    64, 1, noise=args.noise),
-conv_block(64,   64, 2, noise=args.noise),
+conv_block(3,    64, 1, noise=args.noise, weights=weights[0]),
+conv_block(64,   64, 2, noise=args.noise, weights=weights[1]),
 
-conv_block(64,   128, 1, noise=args.noise),
-conv_block(128,  128, 2, noise=args.noise),
+conv_block(64,   128, 1, noise=args.noise, weights=weights[2]),
+conv_block(128,  128, 2, noise=args.noise, weights=weights[3]),
 
-conv_block(128,  256, 1, noise=args.noise),
-conv_block(256,  256, 2, noise=args.noise),
+conv_block(128,  256, 1, noise=args.noise, weights=weights[4]),
+conv_block(256,  256, 2, noise=args.noise, weights=weights[5]),
 
-conv_block(256,  512, 1, noise=args.noise),
-conv_block(512,  512, 2, noise=args.noise),
+conv_block(256,  512, 1, noise=args.noise, weights=weights[6]),
+conv_block(512,  512, 2, noise=args.noise, weights=weights[7]),
 
-conv_block(512,  1024, 1, noise=args.noise),
-conv_block(1024, 1024, 1, noise=args.noise),
+conv_block(512,  1024, 1, noise=args.noise, weights=weights[8]),
+conv_block(1024, 1024, 1, noise=args.noise, weights=weights[9]),
 
-avg_pool(4, 4),
-dense_block(1024, 1000, noise=args.noise)
+avg_pool(4, 4, weights=weights[10]),
+dense_block(1024, 1000, noise=args.noise, weights=weights[11])
 ])
 '''
 m = model(layers=[
@@ -169,6 +169,7 @@ conv_block(512,  1024, 1, noise=args.noise, weights=weights[5]),
 avg_pool(4, 4, weights=weights[6]),
 dense_block(1024, 1000, noise=args.noise, weights=weights[7])
 ])
+'''
 ###############################################################
 
 learning_rate = tf.placeholder(tf.float32, shape=())
