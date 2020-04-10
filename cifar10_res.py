@@ -56,9 +56,9 @@ y_test = keras.utils.to_categorical(y_test, 10)
 ####################################
 
 m = model(layers=[
-res_block(3,   64,  2, noise=args.noise),
-res_block(64,  128, 2, noise=args.noise),
-res_block(128, 256, 2, noise=args.noise),
+res_block2(3,   64,  2, noise=args.noise),
+res_block2(64,  128, 2, noise=args.noise),
+res_block2(128, 256, 2, noise=args.noise),
 avg_pool(4, 4),
 dense_block(256, 10, noise=args.noise)
 ])

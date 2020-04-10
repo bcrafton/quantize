@@ -197,7 +197,7 @@ class res_block1(layer):
     def train(self, x):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
-        y3 = quantize_and_dequantize(y2 + x)
+        y3 = quantize_and_dequantize(y2 + x, -128, 127)
         return y3
     
     def collect(self, x):
@@ -254,13 +254,13 @@ class res_block2(layer):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
         y3 = self.conv3.train(x)
-        y4 = quantize_and_dequantize(y2 + y3)
+        y4 = quantize_and_dequantize(y2 + y3, -128, 127)
         return y4
     
     def collect(self, x):
         y1, params1 = self.conv1.collect(x)
         y2, params2 = self.conv2.collect(y1)
-        y3, params3 = self.conv2.collect(x)
+        y3, params3 = self.conv3.collect(x)
         y4, s4 = quantize(y2 + y3, -128, 127)
         params4 = {self.layer_id: {'scale': s4}}
         
@@ -274,7 +274,7 @@ class res_block2(layer):
     def predict(self, x):
         y1 = self.conv1.predict(x)
         y2 = self.conv2.predict(y1)
-        y3 = self.conv2.predict(x)
+        y3 = self.conv3.predict(x)
         y4 = quantize_predict(y2 + y3, self.q, -128, 127)
         return y4
         
@@ -282,7 +282,7 @@ class res_block2(layer):
         weights_dict = {}
         weights1 = self.conv1.get_weights()
         weights2 = self.conv2.get_weights()
-        weights3 = self.conv2.get_weights()
+        weights3 = self.conv3.get_weights()
         
         weights_dict.update(weights1)
         weights_dict.update(weights2)
