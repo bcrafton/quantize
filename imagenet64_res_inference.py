@@ -136,7 +136,7 @@ val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
 
-weights = np.load('imagenet_weights.npy', allow_pickle=True).item()
+weights = np.load(args.name, allow_pickle=True).item()
 
 m = model(layers=[
 conv_block((3,3,3,64), 1, noise=None, weights=weights),
