@@ -7,9 +7,9 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--lr', type=float, default=1e-2)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--noise', type=float, default=0.)
 parser.add_argument('--gpu', type=int, default=0)
@@ -238,6 +238,9 @@ for ii in range(0, args.epochs):
 
 sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
 
+# MAKE SURE THIS IS SET CORRECTLY!!!
+collect_examples = len(train_filenames)
+
 scales = []
 total_correct = 0
 start = time.time()
@@ -260,7 +263,7 @@ for jj in range(0, len(train_filenames), args.batch_size):
 
 for layer in scales.keys():
     for param in scales[layer].keys():
-        scales[layer][param] = scales[layer][param] / (50000 / args.batch_size)
+        scales[layer][param] = scales[layer][param] / (collect_examples / args.batch_size)
 
 ##################################################################
 
