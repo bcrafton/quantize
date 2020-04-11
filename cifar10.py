@@ -6,7 +6,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=1)
+parser.add_argument('--epochs', type=int, default=5)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=5e-4)
 parser.add_argument('--eps', type=float, default=1.)
@@ -73,7 +73,7 @@ x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 
 model_train = m.train(x=x)
-model_predict, model_collect = m.collect(x=x)
+# model_predict, model_collect = m.collect(x=x)
 
 ####################################
 
@@ -85,9 +85,9 @@ train_predict = tf.argmax(model_train, axis=1)
 train_correct = tf.equal(train_predict, tf.argmax(y, 1))
 train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
 
-predict = tf.argmax(model_predict, axis=1)
-correct = tf.equal(predict, tf.argmax(y, 1))
-sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+# predict = tf.argmax(model_predict, axis=1)
+# correct = tf.equal(predict, tf.argmax(y, 1))
+# sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
 ####################################
 
@@ -137,7 +137,7 @@ for ii in range(args.epochs):
     print ("epoch %d/%d: %f" % (ii + 1, args.epochs, acc))
 
 ####################################
-
+'''
 scales = None
 total_correct = 0
 for jj in range(0, 50000, args.batch_size):
@@ -174,7 +174,7 @@ for key in weight_dict.keys():
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
-
+'''
 ####################################
 
 
