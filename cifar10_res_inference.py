@@ -58,9 +58,17 @@ y_test = keras.utils.to_categorical(y_test, 10)
 weights = np.load('cifar10_weights.npy', allow_pickle=True).item()
 
 m = model(layers=[
-res_block(3,   64,  2, noise=args.noise, weights=weights),
-res_block(64,  128, 2, noise=args.noise, weights=weights),
-res_block(128, 256, 2, noise=args.noise, weights=weights),
+conv_block((3,3,3,64), 1, noise=None, weights=weights),
+
+res_block2(64,   64, 2, noise=None, weights=weights),
+res_block1(64,   64, 1, noise=None, weights=weights),
+
+res_block2(64,   128, 2, noise=None, weights=weights),
+res_block1(128,  128, 1, noise=None, weights=weights),
+
+res_block2(128,  256, 2, noise=None, weights=weights),
+res_block1(256,  256, 1, noise=None, weights=weights),
+
 avg_pool(4, 4, weights=weights),
 dense_block(256, 10, noise=args.noise, weights=weights)
 ])
