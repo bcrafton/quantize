@@ -98,21 +98,25 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, shape, p, noise, weights=None):
+    def __init__(self, shape, p, noise, weights=None, relu=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
         self.k, _, self.f1, self.f2 = shape
         self.p = p
-        self.pad = self.p // 2
+        self.pad = self.k // 2
         
         self.noise = noise
+
+        self.relu = relu
         
         if weights:
-            f, b, q = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['q']
-            self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
-            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.q = q
+            f, b, g = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['g']
+            assert (np.shape(f) == shape)
+            print (self.layer_id, np.shape(f))
+            self.f = tf.Variable(f, dtype=tf.float32)
+            self.b = tf.Variable(b, dtype=tf.float32)
+            self.g = tf.Variable(g, dtype=tf.float32)
         else:
             self.f = tf.Variable(init_filters(size=[self.k,self.k,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
@@ -120,28 +124,29 @@ class conv_block(layer):
             self.q = None
 
     def train(self, x):
-        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'VALID') # there is no bias when we have bn.
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') # there is no bias when we have bn.
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        std = tf.sqrt(var + 1e-3)
+        std = tf.sqrt(var + 1e-5)
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
         qf = quantize_and_dequantize(fold_f, -128, 127)
         # qb = quantize_and_dequantize(fold_b, -128, 127) 
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + fold_b
-        relu = tf.nn.relu(conv)
-        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
 
-        qpool = quantize_and_dequantize(pool, -128, 127)
-        return qpool
+        if self.relu:
+            out = tf.nn.relu(conv)
+        else:
+            out = conv
+
+        qout = quantize_and_dequantize(out, -128, 127)
+        return qout
     
     def collect(self, x):
-        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-    
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'VALID') # there is no bias when we have bn.
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
@@ -151,7 +156,7 @@ class conv_block(layer):
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
@@ -163,12 +168,10 @@ class conv_block(layer):
         return qpool, {self.layer_id: {'scale': spool, 'std': std, 'mean': mean}}
 
     def predict(self, x):
-        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-    
         qf, sf = quantize(self.f, -128, 127)
         qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         
@@ -195,17 +198,18 @@ class res_block1(layer):
         self.noise = noise
         
         if weights:
-            self.q = weights[self.layer_id]['q']
+            # self.q = weights[self.layer_id]['q']
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights, relu=False)
         else:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
 
     def train(self, x):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
-        y3 = quantize_and_dequantize(y2 + x, -128, 127)
+        y3 = tf.nn.relu(y2 + x)
+        y3 = quantize_and_dequantize(y3, -128, 127)
         return y3
     
     def collect(self, x):
@@ -249,20 +253,21 @@ class res_block2(layer):
         self.noise = noise
         
         if weights:
-            self.q = weights[self.layer_id]['q']
+            # self.q = weights[self.layer_id]['q']
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights)
-            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=weights)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights, relu=False)
+            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=weights, relu=False)
         else:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None)
-            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None)
+            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
+            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None, relu=False)
 
     def train(self, x):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
         y3 = self.conv3.train(x)
-        y4 = quantize_and_dequantize(y2 + y3, -128, 127)
+        y4 = tf.nn.relu(y2 + y3)
+        y4 = quantize_and_dequantize(y4, -128, 127)
         return y4
     
     def collect(self, x):
@@ -310,10 +315,10 @@ class dense_block(layer):
         self.noise = noise
         
         if weights:
-            w, b, q = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['q']
+            w, b = weights[self.layer_id]['w'], weights[self.layer_id]['b']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.q = q
+            # self.q = q
         else:
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
@@ -321,10 +326,10 @@ class dense_block(layer):
         
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
-        qb = quantize_and_dequantize(self.b, -128, 127)
+        # qb = quantize_and_dequantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) + self.b
         qfc = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
@@ -372,7 +377,7 @@ class avg_pool(layer):
         
     def train(self, x):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = quantize_and_dequantize(pool, -128, 127)
+        qpool = pool # quantize_and_dequantize(pool, -128, 127)
         return qpool
     
     def collect(self, x):
@@ -407,7 +412,7 @@ class max_pool(layer):
         
     def train(self, x):        
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = quantize_and_dequantize(pool, -128, 127)
+        qpool = pool # quantize_and_dequantize(pool, -128, 127)
         return qpool
     
     def collect(self, x):

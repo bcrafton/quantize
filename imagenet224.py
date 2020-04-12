@@ -2,13 +2,14 @@
 import argparse
 import os
 import sys
+import time
 
 ##############################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
-parser.add_argument('--batch_size', type=int, default=100)
-parser.add_argument('--lr', type=float, default=3e-3)
+parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--lr', type=float, default=1e-2)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--name', type=str, default='imagenet224')
@@ -43,21 +44,6 @@ from bc_utils.init_tensor import init_filters
 from bc_utils.init_tensor import init_matrix
 
 from layers import *
-
-# IMAGENET_MEAN = [123.68, 116.78, 103.94]
-
-##############################################
-
-def in_top_k(x, y, k):
-    x = tf.cast(x, dtype=tf.float32)
-    y = tf.cast(y, dtype=tf.int32)
-
-    _, topk = tf.nn.top_k(input=x, k=k)
-    topk = tf.transpose(topk)
-    correct = tf.equal(y, topk)
-    correct = tf.cast(correct, dtype=tf.int32)
-    correct = tf.reduce_sum(correct, axis=0)
-    return correct
 
 ##############################################
 
@@ -98,9 +84,10 @@ def train_preprocess(image, label):
     centered_image = flip_image - means                                     # (5)
     '''
     # image = tf.image.resize_image_with_crop_or_pad(image, 224, 224)  
-    # image = tf.image.resize(image, (256, 256))
+    
+    image = tf.image.resize(image, (256, 256))
     image = tf.image.central_crop(image, 0.875)
-
+    
     image = image / 255.
     image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
@@ -120,7 +107,8 @@ def val_preprocess(image, label):
     centered_image = crop_image - means                                     # (4)
     '''
     # image = tf.image.resize_image_with_crop_or_pad(image, 224, 224)
-    # image = tf.image.resize(image, (256, 256))
+    
+    image = tf.image.resize(image, (256, 256))
     image = tf.image.central_crop(image, 0.875)
 
     image = image / 255.
@@ -199,23 +187,23 @@ val_imgs, val_labs = get_validation_dataset()
 
 val_dataset = tf.data.Dataset.from_tensor_slices((filename, label))
 # val_dataset = val_dataset.shuffle(len(val_imgs))
-val_dataset = val_dataset.map(parse_function, num_parallel_calls=4)
-val_dataset = val_dataset.map(val_preprocess, num_parallel_calls=4)
+val_dataset = val_dataset.map(parse_function, num_parallel_calls=8)
+val_dataset = val_dataset.map(val_preprocess, num_parallel_calls=8)
 val_dataset = val_dataset.batch(args.batch_size)
 val_dataset = val_dataset.repeat()
-val_dataset = val_dataset.prefetch(2)
+val_dataset = val_dataset.prefetch(8)
 
 ###############################################################
 
 train_imgs, train_labs = get_train_dataset()
 
 train_dataset = tf.data.Dataset.from_tensor_slices((filename, label))
-# train_dataset = train_dataset.shuffle(len(train_imgs))
-train_dataset = train_dataset.map(parse_function, num_parallel_calls=4)
-train_dataset = train_dataset.map(train_preprocess, num_parallel_calls=4)
+train_dataset = train_dataset.shuffle(len(train_imgs))
+train_dataset = train_dataset.map(parse_function, num_parallel_calls=8)
+train_dataset = train_dataset.map(train_preprocess, num_parallel_calls=8)
 train_dataset = train_dataset.batch(args.batch_size)
 train_dataset = train_dataset.repeat()
-train_dataset = train_dataset.prefetch(2)
+train_dataset = train_dataset.prefetch(8)
 
 ###############################################################
 
@@ -258,15 +246,15 @@ dense_block(512, 1000, noise=None, weights=weights)
 learning_rate = tf.placeholder(tf.float32, shape=())
 
 model_train = m.train(x=features)
-model_predict, model_collect = m.collect(x=features)
+# model_predict, model_collect = m.collect(x=features)
 
 train_predict = tf.argmax(model_train, axis=1)
 train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
 train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
 
-predict = tf.argmax(model_predict, axis=1)
-correct = tf.equal(predict, tf.argmax(labels, 1))
-sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+# predict = tf.argmax(model_predict, axis=1)
+# correct = tf.equal(predict, tf.argmax(labels, 1))
+# sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
 ###############################################################
 
@@ -274,6 +262,7 @@ weights = m.get_weights()
 
 loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
 
+params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
 train = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=args.eps).apply_gradients(grads_and_vars)
@@ -293,11 +282,12 @@ val_handle = sess.run(val_iterator.string_handle())
 for ii in range(0, args.epochs):
     print('epoch %d/%d' % (ii, args.epochs))
 
-    sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
+    # sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
+    sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
     total_correct = 0
     start = time.time()
-    for jj in range(0, len(train_filenames), args.batch_size):
+    for jj in range(0, len(train_imgs), args.batch_size):
         [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
@@ -307,7 +297,7 @@ for ii in range(0, args.epochs):
             print (p)
 
 ##################################################################
-
+'''
 sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
 
 # MAKE SURE THIS IS SET CORRECTLY!!!
@@ -349,7 +339,7 @@ for key in weight_dict.keys():
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
-
+'''
 ##################################################################
 
 
