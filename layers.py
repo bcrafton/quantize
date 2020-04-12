@@ -104,6 +104,8 @@ class conv_block(layer):
         
         self.k, _, self.f1, self.f2 = shape
         self.p = p
+        self.pad = self.p // 2
+        
         self.noise = noise
         
         if weights:
@@ -118,7 +120,9 @@ class conv_block(layer):
             self.q = None
 
     def train(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'VALID') # there is no bias when we have bn.
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
@@ -127,7 +131,7 @@ class conv_block(layer):
         qf = quantize_and_dequantize(fold_f, -128, 127)
         # qb = quantize_and_dequantize(fold_b, -128, 127) 
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + fold_b
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
@@ -135,7 +139,9 @@ class conv_block(layer):
         return qpool
     
     def collect(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+    
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'VALID') # there is no bias when we have bn.
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
@@ -145,7 +151,7 @@ class conv_block(layer):
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
@@ -157,10 +163,12 @@ class conv_block(layer):
         return qpool, {self.layer_id: {'scale': spool, 'std': std, 'mean': mean}}
 
     def predict(self, x):
+        x = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+    
         qf, sf = quantize(self.f, -128, 127)
         qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'VALID') + qb
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
         
@@ -384,7 +392,38 @@ class avg_pool(layer):
 
 #############
 
+class max_pool(layer):
+    def __init__(self, s, p, weights=None):
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+    
+        self.s = s
+        self.p = p
+        
+        if weights:
+            self.q = weights[self.layer_id]['q']
+        else:
+            self.q = 1
+        
+    def train(self, x):        
+        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool = quantize_and_dequantize(pool, -128, 127)
+        return qpool
+    
+    def collect(self, x):
+        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool, spool = quantize(pool, -128, 127)
+        return qpool, {self.layer_id: {'scale': spool}}
 
+    def predict(self, x):
+        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
+        qpool = quantize_predict(pool, self.q, -128, 127) # this only works because we use np.ceil(scales)
+        return qpool
+        
+    def get_weights(self):    
+        weights_dict = {}
+        weights_dict[self.layer_id] = {}
+        return weights_dict
 
 
 
