@@ -199,11 +199,11 @@ train_imgs, train_labs = get_train_dataset()
 
 train_dataset = tf.data.Dataset.from_tensor_slices((filename, label))
 train_dataset = train_dataset.shuffle(len(train_imgs))
-train_dataset = train_dataset.map(parse_function, num_parallel_calls=8)
-train_dataset = train_dataset.map(train_preprocess, num_parallel_calls=8)
+train_dataset = train_dataset.map(parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+train_dataset = train_dataset.map(train_preprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 train_dataset = train_dataset.batch(args.batch_size)
 train_dataset = train_dataset.repeat()
-train_dataset = train_dataset.prefetch(8)
+train_dataset = train_dataset.prefetch(16)
 
 ###############################################################
 
@@ -288,7 +288,7 @@ for ii in range(0, args.epochs):
     total_correct = 0
     start = time.time()
     for jj in range(0, len(train_imgs), args.batch_size):
-        [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
+        [np_sum_correct] = sess.run([train_sum_correct], feed_dict={handle: train_handle, learning_rate: 0.})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
             acc = total_correct / (jj + args.batch_size)
