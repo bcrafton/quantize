@@ -77,6 +77,9 @@ def evaluate(x, y):
     sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
     return predict, actual, sum_correct
 
+def get_weights():
+    return m.get_weights()
+
 ##################################################################
 
 dataset = np.load('val_dataset.npy', allow_pickle=True).item()
@@ -93,6 +96,10 @@ for jj in range(0, 1024, args.batch_size):
     y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e])
     total_correct += correct
     # print (y, yhat)
+
+weights = get_weights()
+
+np.save('resnet18_weights_quant', weights)
 
 acc = total_correct / 1024
 print (acc)

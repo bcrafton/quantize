@@ -45,6 +45,7 @@ class model:
 
 class layer:
     layer_id = 0
+    layer_num = 0
     
     def __init__(self):
         assert(False)
@@ -67,6 +68,8 @@ class conv_block(layer):
     def __init__(self, shape, p, noise, weights=None, relu=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
         
         self.k, _, self.f1, self.f2 = shape
         self.p = p
@@ -100,7 +103,9 @@ class conv_block(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights_dict[self.layer_num] = {'f': self.f.numpy(), 'b': self.b.numpy()}
+        return weights_dict
         
 #############
 
@@ -108,6 +113,8 @@ class res_block1(layer):
     def __init__(self, f1, f2, p, noise, weights=None):
         # self.layer_id = layer.layer_id
         # layer.layer_id += 1
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
 
         self.f1 = f1
         self.f2 = f2
@@ -134,7 +141,14 @@ class res_block1(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights1 = self.conv1.get_weights()
+        weights2 = self.conv2.get_weights()
+        
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
+        weights_dict[self.layer_num] = {}
+        return weights_dict
 
 #############
 
@@ -142,6 +156,8 @@ class res_block2(layer):
     def __init__(self, f1, f2, p, noise, weights=None):
         # self.layer_id = layer.layer_id
         # layer.layer_id += 1
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
 
         self.f1 = f1
         self.f2 = f2
@@ -171,7 +187,16 @@ class res_block2(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights1 = self.conv1.get_weights()
+        weights2 = self.conv2.get_weights()
+        weights3 = self.conv3.get_weights()
+        
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
+        weights_dict.update(weights3)
+        weights_dict[self.layer_num] = {}
+        return weights_dict
 
 #############
 
@@ -179,6 +204,8 @@ class dense_block(layer):
     def __init__(self, isize, osize, noise, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
     
         self.isize = isize
         self.osize = osize
@@ -204,13 +231,17 @@ class dense_block(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights_dict[self.layer_num] = {'w': self.w.numpy(), 'b': self.b.numpy()}
+        return weights_dict
 
 #############
 
 class avg_pool(layer):
     def __init__(self, s, p, weights=None):
-    
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
+
         self.s = s
         self.p = p
         
@@ -225,13 +256,17 @@ class avg_pool(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights_dict[self.layer_num] = {}
+        return weights_dict
 
 #############
 
 class max_pool(layer):
     def __init__(self, s, p, weights=None):
-    
+        self.layer_num = layer.layer_num
+        layer.layer_num += 1
+
         self.s = s
         self.p = p
         
@@ -246,7 +281,9 @@ class max_pool(layer):
         assert (False)
 
     def get_weights(self):
-        assert (False)
+        weights_dict = {}
+        weights_dict[self.layer_num] = {}
+        return weights_dict
 
 
 
