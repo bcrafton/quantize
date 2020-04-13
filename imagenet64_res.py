@@ -29,7 +29,7 @@ for device in gpu_devices:
 
 ###############################################################
 
-weights = np.load('resnet18.npy', allow_pickle=True).item()
+weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
 
 # 2 things:
 # > relu 6
@@ -71,7 +71,6 @@ dense_block(512, 1000, noise=None, weights=weights)
 
 def evaluate(x, y):
     model_predict = tf.nn.softmax(m.train(x))
-    print (model_predict)
     predict = tf.argmax(model_predict, axis=1)
     actual = tf.argmax(y, 1)
     correct = tf.equal(predict, actual)
@@ -93,7 +92,7 @@ for jj in range(0, 1024, args.batch_size):
     e = jj + args.batch_size
     y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e])
     total_correct += correct
-    print (y, yhat)
+    # print (y, yhat)
 
 acc = total_correct / 1024
 print (acc)

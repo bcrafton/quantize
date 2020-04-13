@@ -100,8 +100,64 @@ weight_dict[19]['b'] = model.layer4[1].conv2.bias().detach().numpy()
 
 ###################################
 
+weight_dict[0]['z'] = model.conv1.zero_point
+
+weight_dict[1]['z'] = model.layer1[0].conv1.zero_point
+weight_dict[2]['z'] = model.layer1[0].conv2.zero_point
+weight_dict[3]['z'] = model.layer1[1].conv1.zero_point
+weight_dict[4]['z'] = model.layer1[1].conv2.zero_point
+
+weight_dict[5]['z'] = model.layer2[0].conv1.zero_point
+weight_dict[6]['z'] = model.layer2[0].conv2.zero_point
+weight_dict[7]['z'] = model.layer2[0].downsample[0].zero_point
+weight_dict[8]['z'] = model.layer2[1].conv1.zero_point
+weight_dict[9]['z'] = model.layer2[1].conv2.zero_point
+
+weight_dict[10]['z'] = model.layer3[0].conv1.zero_point
+weight_dict[11]['z'] = model.layer3[0].conv2.zero_point
+weight_dict[12]['z'] = model.layer3[0].downsample[0].zero_point
+weight_dict[13]['z'] = model.layer3[1].conv1.zero_point
+weight_dict[14]['z'] = model.layer3[1].conv2.zero_point
+
+weight_dict[15]['z'] = model.layer4[0].conv1.zero_point
+weight_dict[16]['z'] = model.layer4[0].conv2.zero_point
+weight_dict[17]['z'] = model.layer4[0].downsample[0].zero_point
+weight_dict[18]['z'] = model.layer4[1].conv1.zero_point
+weight_dict[19]['z'] = model.layer4[1].conv2.zero_point
+
+###################################
+
+weight_dict[0]['s'] = model.conv1.scale
+
+weight_dict[1]['s'] = model.layer1[0].conv1.scale
+weight_dict[2]['s'] = model.layer1[0].conv2.scale
+weight_dict[3]['s'] = model.layer1[1].conv1.scale
+weight_dict[4]['s'] = model.layer1[1].conv2.scale
+
+weight_dict[5]['s'] = model.layer2[0].conv1.scale
+weight_dict[6]['s'] = model.layer2[0].conv2.scale
+weight_dict[7]['s'] = model.layer2[0].downsample[0].scale
+weight_dict[8]['s'] = model.layer2[1].conv1.scale
+weight_dict[9]['s'] = model.layer2[1].conv2.scale
+
+weight_dict[10]['s'] = model.layer3[0].conv1.scale
+weight_dict[11]['s'] = model.layer3[0].conv2.scale
+weight_dict[12]['s'] = model.layer3[0].downsample[0].scale
+weight_dict[13]['s'] = model.layer3[1].conv1.scale
+weight_dict[14]['s'] = model.layer3[1].conv2.scale
+
+weight_dict[15]['s'] = model.layer4[0].conv1.scale
+weight_dict[16]['s'] = model.layer4[0].conv2.scale
+weight_dict[17]['s'] = model.layer4[0].downsample[0].scale
+weight_dict[18]['s'] = model.layer4[1].conv1.scale
+weight_dict[19]['s'] = model.layer4[1].conv2.scale
+
+###################################
+
 weight_dict[20]['w'] = model.fc.weight().int_repr().numpy().transpose(1, 0)
 weight_dict[20]['b'] = model.fc.bias().detach().numpy()
+weight_dict[20]['z'] = model.fc.zero_point
+weight_dict[20]['s'] = model.fc.scale
 
 ###################################
 

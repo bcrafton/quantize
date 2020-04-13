@@ -76,33 +76,20 @@ class conv_block(layer):
         
         if weights:
             print (self.layer_id, shape, weights[self.layer_id].keys())
-            f, g, b, mean, var = weights[self.layer_id]['f'], weights[self.layer_id]['g'], weights[self.layer_id]['b'], weights[self.layer_id]['mean'], weights[self.layer_id]['var']
+            f, b = weights[self.layer_id]['f'], weights[self.layer_id]['b']
             assert (np.shape(f) == shape)
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
-            self.g = tf.Variable(g, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.mean = tf.Variable(mean, dtype=tf.float32, trainable=False)
-            self.var = tf.Variable(var, dtype=tf.float32, trainable=False)
         else:
-            self.f = tf.Variable(init_filters(size=[self.k,self.k,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-            self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
-            self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
+            assert (False)
 
     def train(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'SAME') 
-        
-        mean = tf.reduce_mean(conv, axis=[0,1,2])
-        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        std = tf.sqrt(self.var + 1e-5)
-        bn = ((conv - self.mean) / std) * self.g + self.b
-        
-        # bn = tf.Print(bn, [tf.reduce_max(mean), tf.reduce_max(self.mean)], message='', summarize=1000)
-        # bn = tf.Print(bn, [self.layer_id, tf.reduce_max(std), tf.reduce_max(var), tf.reduce_max(self.var)], message='', summarize=1000)
-                
+        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'SAME') + self.b
+
         if self.relu:
-            out = tf.nn.relu(bn)
+            out = tf.nn.relu(conv)
         else:
-            out = bn
+            out = conv
         
         return out
     
