@@ -12,7 +12,7 @@ num_ftrs = model.fc.in_features
 
 ##############################
 
-# print (model)
+print (model)
 
 ##############################
 
@@ -33,7 +33,7 @@ weights = np.array(model.conv1.weight().int_repr())
 
 weight_dict = {}
 
-for layer in range(20):
+for layer in range(21):
     weight_dict[layer] = {}
 
 ##############################
@@ -73,30 +73,35 @@ weight_dict[19]['f'] = model.layer4[1].conv2.weight().int_repr().numpy().transpo
 # print (model.conv1.bias())
 # print (model.conv1.bias().detach().numpy())
 
-weight_dict[0]['f'] = model.conv1.bias().detach().numpy()
+weight_dict[0]['b'] = model.conv1.bias().detach().numpy()
 
-weight_dict[1]['f'] = model.layer1[0].conv1.bias().detach().numpy()
-weight_dict[2]['f'] = model.layer1[0].conv2.bias().detach().numpy()
-weight_dict[3]['f'] = model.layer1[1].conv1.bias().detach().numpy()
-weight_dict[4]['f'] = model.layer1[1].conv2.bias().detach().numpy()
+weight_dict[1]['b'] = model.layer1[0].conv1.bias().detach().numpy()
+weight_dict[2]['b'] = model.layer1[0].conv2.bias().detach().numpy()
+weight_dict[3]['b'] = model.layer1[1].conv1.bias().detach().numpy()
+weight_dict[4]['b'] = model.layer1[1].conv2.bias().detach().numpy()
 
-weight_dict[5]['f'] = model.layer2[0].conv1.bias().detach().numpy()
-weight_dict[6]['f'] = model.layer2[0].conv2.bias().detach().numpy()
-weight_dict[7]['f'] = model.layer2[0].downsample[0].bias().detach().numpy()
-weight_dict[8]['f'] = model.layer2[1].conv1.bias().detach().numpy()
-weight_dict[9]['f'] = model.layer2[1].conv2.bias().detach().numpy()
+weight_dict[5]['b'] = model.layer2[0].conv1.bias().detach().numpy()
+weight_dict[6]['b'] = model.layer2[0].conv2.bias().detach().numpy()
+weight_dict[7]['b'] = model.layer2[0].downsample[0].bias().detach().numpy()
+weight_dict[8]['b'] = model.layer2[1].conv1.bias().detach().numpy()
+weight_dict[9]['b'] = model.layer2[1].conv2.bias().detach().numpy()
 
-weight_dict[10]['f'] = model.layer3[0].conv1.bias().detach().numpy()
-weight_dict[11]['f'] = model.layer3[0].conv2.bias().detach().numpy()
-weight_dict[12]['f'] = model.layer3[0].downsample[0].bias().detach().numpy()
-weight_dict[13]['f'] = model.layer3[1].conv1.bias().detach().numpy()
-weight_dict[14]['f'] = model.layer3[1].conv2.bias().detach().numpy()
+weight_dict[10]['b'] = model.layer3[0].conv1.bias().detach().numpy()
+weight_dict[11]['b'] = model.layer3[0].conv2.bias().detach().numpy()
+weight_dict[12]['b'] = model.layer3[0].downsample[0].bias().detach().numpy()
+weight_dict[13]['b'] = model.layer3[1].conv1.bias().detach().numpy()
+weight_dict[14]['b'] = model.layer3[1].conv2.bias().detach().numpy()
 
-weight_dict[15]['f'] = model.layer4[0].conv1.bias().detach().numpy()
-weight_dict[16]['f'] = model.layer4[0].conv2.bias().detach().numpy()
-weight_dict[17]['f'] = model.layer4[0].downsample[0].bias().detach().numpy()
-weight_dict[18]['f'] = model.layer4[1].conv1.bias().detach().numpy()
-weight_dict[19]['f'] = model.layer4[1].conv2.bias().detach().numpy()
+weight_dict[15]['b'] = model.layer4[0].conv1.bias().detach().numpy()
+weight_dict[16]['b'] = model.layer4[0].conv2.bias().detach().numpy()
+weight_dict[17]['b'] = model.layer4[0].downsample[0].bias().detach().numpy()
+weight_dict[18]['b'] = model.layer4[1].conv1.bias().detach().numpy()
+weight_dict[19]['b'] = model.layer4[1].conv2.bias().detach().numpy()
+
+###################################
+
+weight_dict[20]['w'] = model.fc.weight().int_repr().numpy().transpose(1, 0)
+weight_dict[20]['b'] = model.fc.bias().detach().numpy()
 
 ###################################
 
