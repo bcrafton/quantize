@@ -219,7 +219,7 @@ val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
 
-weights = np.load('resnet18_weights.npy', allow_pickle=True).item()
+weights = np.load('imagenet224.npy', allow_pickle=True).item()
 
 m = model(layers=[
 conv_block((7,7,3,64), 2, noise=None, weights=weights),
@@ -244,29 +244,11 @@ dense_block(512, 1000, noise=None, weights=weights)
 
 ###############################################################
 
-learning_rate = tf.placeholder(tf.float32, shape=())
-
-model_train = m.train(x=features)
-model_predict, model_collect = m.collect(x=features)
-
-train_predict = tf.argmax(model_train, axis=1)
-train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
-train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
+model_predict = m.predict(x=features)
 
 predict = tf.argmax(model_predict, axis=1)
 correct = tf.equal(predict, tf.argmax(labels, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-
-###############################################################
-
-weights = m.get_weights()
-
-loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=model_train))
-
-params = tf.trainable_variables()
-grads = tf.gradients(loss, params)
-grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=args.eps).apply_gradients(grads_and_vars)
 
 ###############################################################
 
@@ -280,65 +262,18 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-for ii in range(0, 1):
-    print('epoch %d/%d' % (ii, args.epochs))
+sess.run(val_iterator.initializer, feed_dict={filename: val_imgs, label: val_labs})
 
-    sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
-
-    total_correct = 0
-    start = time.time()
-    for jj in range(0, 250000, args.batch_size):
-        [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
-        total_correct += np_sum_correct
-        if (jj % (100 * args.batch_size) == 0):
-            acc = total_correct / (jj + args.batch_size)
-            img_per_sec = (jj + args.batch_size) / (time.time() - start)
-            p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
-            print (p)
-
-##################################################################
-
-sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
-
-# MAKE SURE THIS IS SET CORRECTLY!!!
-collect_examples = 1000 * args.batch_size
-
-scales = []
 total_correct = 0
 start = time.time()
-for jj in range(0, collect_examples, args.batch_size):
-    [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={handle: train_handle, learning_rate: 0.})
+for jj in range(0, len(val_imgs), args.batch_size):
+    [np_sum_correct] = sess.run([sum_correct], feed_dict={handle: val_handle})
     total_correct += np_sum_correct
-
-    if len(scales):
-        for layer in np_model_collect.keys():
-            for param in np_model_collect[layer].keys():
-                scales[layer][param] += np_model_collect[layer][param]
-    else:
-        scales = np_model_collect
-
     if (jj % (100 * args.batch_size) == 0):
         acc = total_correct / (jj + args.batch_size)
         img_per_sec = (jj + args.batch_size) / (time.time() - start)
         p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
         print (p)
-
-for layer in scales.keys():
-    for param in scales[layer].keys():
-        scales[layer][param] = scales[layer][param] / (collect_examples / args.batch_size)
-
-##################################################################
-
-weight_dict = sess.run(weights, feed_dict={})
-
-for key in weight_dict.keys():
-    weight_dict[key]['q'] = np.ceil(scales[key]['scale'])
-    if len(scales[key].keys()) == 3:
-        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key]['std'])
-        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key]['std']) * scales[key]['mean']
-
-weight_dict['acc'] = acc
-np.save(args.name, weight_dict)
 
 ##################################################################
 
