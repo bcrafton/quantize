@@ -9,7 +9,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--lr', type=float, default=3e-4)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--name', type=str, default='imagenet224')
@@ -188,11 +188,11 @@ val_imgs, val_labs = get_validation_dataset()
 
 val_dataset = tf.data.Dataset.from_tensor_slices((filename, label))
 # val_dataset = val_dataset.shuffle(len(val_imgs))
-val_dataset = val_dataset.map(parse_function, num_parallel_calls=8)
-val_dataset = val_dataset.map(val_preprocess, num_parallel_calls=8)
+val_dataset = val_dataset.map(parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+val_dataset = val_dataset.map(val_preprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 val_dataset = val_dataset.batch(args.batch_size)
 val_dataset = val_dataset.repeat()
-val_dataset = val_dataset.prefetch(8)
+val_dataset = val_dataset.prefetch(16)
 
 ###############################################################
 
@@ -247,15 +247,15 @@ dense_block(512, 1000, noise=None, weights=weights)
 learning_rate = tf.placeholder(tf.float32, shape=())
 
 model_train = m.train(x=features)
-# model_predict, model_collect = m.collect(x=features)
+model_predict, model_collect = m.collect(x=features)
 
 train_predict = tf.argmax(model_train, axis=1)
 train_correct = tf.equal(train_predict, tf.argmax(labels, 1))
 train_sum_correct = tf.reduce_sum(tf.cast(train_correct, tf.float32))
 
-# predict = tf.argmax(model_predict, axis=1)
-# correct = tf.equal(predict, tf.argmax(labels, 1))
-# sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+predict = tf.argmax(model_predict, axis=1)
+correct = tf.equal(predict, tf.argmax(labels, 1))
+sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
 ###############################################################
 
@@ -280,14 +280,14 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-for ii in range(0, args.epochs):
+for ii in range(0, 2):
     print('epoch %d/%d' % (ii, args.epochs))
 
     sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
     total_correct = 0
     start = time.time()
-    for jj in range(0, len(train_imgs), args.batch_size):
+    for jj in range(0, 100000, args.batch_size):
         [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
@@ -297,20 +297,20 @@ for ii in range(0, args.epochs):
             print (p)
 
 ##################################################################
-'''
-sess.run(train_iterator.initializer, feed_dict={filename: train_filenames})
+
+sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
 # MAKE SURE THIS IS SET CORRECTLY!!!
-collect_examples = len(train_filenames)
+collect_examples = 500 * args.batch_size
 
 scales = []
 total_correct = 0
 start = time.time()
-for jj in range(0, len(train_filenames), args.batch_size):
+for jj in range(0, collect_examples, args.batch_size):
     [np_sum_correct, np_model_collect] = sess.run([sum_correct, model_collect], feed_dict={handle: train_handle, learning_rate: 0.})
     total_correct += np_sum_correct
 
-    if scales:
+    if len(scales):
         for layer in np_model_collect.keys():
             for param in np_model_collect[layer].keys():
                 scales[layer][param] += np_model_collect[layer][param]
@@ -339,7 +339,7 @@ for key in weight_dict.keys():
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
-'''
+
 ##################################################################
 
 
