@@ -357,7 +357,7 @@ class dense_block(layer):
         qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) + qb
         qfc = quantize_predict(fc, self.q, -128, 127)
         return qfc
         
