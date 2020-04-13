@@ -1,0 +1,114 @@
+
+import torch
+import numpy as np
+import torchvision
+import torchvision.models.quantization as models
+
+# You will need the number of filters in the `fc` for future use.
+# Here the size of each output sample is set to 2.
+# Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
+model = models.resnet18(pretrained=True, progress=True, quantize=True)
+num_ftrs = model.fc.in_features
+
+##############################
+
+# print (model)
+
+##############################
+
+# https://discuss.pytorch.org/t/how-to-extract-individual-weights-after-per-channel-static-quantization/67456/2
+
+##############################
+
+# print (model.conv1.weight().int_repr())
+# print (model.conv1.weight().dequantize())
+
+##############################
+
+weights = np.array(model.conv1.weight().int_repr())
+# print (np.max(weights))
+# print (np.min(weights))
+
+##############################
+
+weight_dict = {}
+
+for layer in range(20):
+    weight_dict[layer] = {}
+
+##############################
+
+weight_dict[0]['f'] = model.conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+
+weight_dict[1]['f'] = model.layer1[0].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[2]['f'] = model.layer1[0].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[3]['f'] = model.layer1[1].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[4]['f'] = model.layer1[1].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+
+weight_dict[5]['f'] = model.layer2[0].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[6]['f'] = model.layer2[0].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[7]['f'] = model.layer2[0].downsample[0].weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[8]['f'] = model.layer2[1].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[9]['f'] = model.layer2[1].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+
+weight_dict[10]['f'] = model.layer3[0].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[11]['f'] = model.layer3[0].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[12]['f'] = model.layer3[0].downsample[0].weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[13]['f'] = model.layer3[1].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[14]['f'] = model.layer3[1].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+
+weight_dict[15]['f'] = model.layer4[0].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[16]['f'] = model.layer4[0].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[17]['f'] = model.layer4[0].downsample[0].weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[18]['f'] = model.layer4[1].conv1.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+weight_dict[19]['f'] = model.layer4[1].conv2.weight().int_repr().numpy().transpose(2, 3, 1, 0)
+
+###################################
+
+# print (dir(model.conv1.bias()))
+# print (model.conv1.weight().int_repr())
+# print (model.conv1.bias().int_repr())
+# print (model.conv1.bias.numpy())
+# print (model.conv1.weight())
+# print (model.conv1.bias())
+# print (model.conv1.bias().detach().numpy())
+
+weight_dict[0]['f'] = model.conv1.bias().detach().numpy()
+
+weight_dict[1]['f'] = model.layer1[0].conv1.bias().detach().numpy()
+weight_dict[2]['f'] = model.layer1[0].conv2.bias().detach().numpy()
+weight_dict[3]['f'] = model.layer1[1].conv1.bias().detach().numpy()
+weight_dict[4]['f'] = model.layer1[1].conv2.bias().detach().numpy()
+
+weight_dict[5]['f'] = model.layer2[0].conv1.bias().detach().numpy()
+weight_dict[6]['f'] = model.layer2[0].conv2.bias().detach().numpy()
+weight_dict[7]['f'] = model.layer2[0].downsample[0].bias().detach().numpy()
+weight_dict[8]['f'] = model.layer2[1].conv1.bias().detach().numpy()
+weight_dict[9]['f'] = model.layer2[1].conv2.bias().detach().numpy()
+
+weight_dict[10]['f'] = model.layer3[0].conv1.bias().detach().numpy()
+weight_dict[11]['f'] = model.layer3[0].conv2.bias().detach().numpy()
+weight_dict[12]['f'] = model.layer3[0].downsample[0].bias().detach().numpy()
+weight_dict[13]['f'] = model.layer3[1].conv1.bias().detach().numpy()
+weight_dict[14]['f'] = model.layer3[1].conv2.bias().detach().numpy()
+
+weight_dict[15]['f'] = model.layer4[0].conv1.bias().detach().numpy()
+weight_dict[16]['f'] = model.layer4[0].conv2.bias().detach().numpy()
+weight_dict[17]['f'] = model.layer4[0].downsample[0].bias().detach().numpy()
+weight_dict[18]['f'] = model.layer4[1].conv1.bias().detach().numpy()
+weight_dict[19]['f'] = model.layer4[1].conv2.bias().detach().numpy()
+
+###################################
+
+np.save('resnet18_quant', weight_dict)
+
+
+
+
+
+
+
+
+
+
+
