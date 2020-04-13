@@ -9,7 +9,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-2)
+parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--name', type=str, default='imagenet224')
@@ -54,7 +54,7 @@ def parse_function(filename, label):
     image_string = tf.read_file(filename)
     image_decoded = tf.image.decode_jpeg(image_string, channels=3)          # (1)
     image = tf.cast(image_decoded, tf.float32)
-    
+    '''
     smallest_side = 256.0
     height, width = tf.shape(image)[0], tf.shape(image)[1]
     height = tf.to_float(height)
@@ -67,7 +67,7 @@ def parse_function(filename, label):
     new_width = tf.to_int32(width * scale)
 
     resized_image = tf.image.resize_images(image, [new_height, new_width])  # (2)
-    
+    '''
     return image, label
 
 # Preprocessing (for training)
@@ -84,7 +84,7 @@ def train_preprocess(image, label):
     centered_image = flip_image - means                                     # (5)
     '''
     # image = tf.image.resize_image_with_crop_or_pad(image, 224, 224)  
-    
+    # image = tf.Print(image, [tf.shape(image)], message='', summarize=1000)
     image = tf.image.resize(image, (256, 256))
     image = tf.image.central_crop(image, 0.875)
     
@@ -108,6 +108,7 @@ def val_preprocess(image, label):
     '''
     # image = tf.image.resize_image_with_crop_or_pad(image, 224, 224)
     
+    # image = tf.Print(image, [tf.shape(image)], message='', summarize=1000)
     image = tf.image.resize(image, (256, 256))
     image = tf.image.central_crop(image, 0.875)
 
@@ -282,13 +283,12 @@ val_handle = sess.run(val_iterator.string_handle())
 for ii in range(0, args.epochs):
     print('epoch %d/%d' % (ii, args.epochs))
 
-    # sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
     sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
     total_correct = 0
     start = time.time()
     for jj in range(0, len(train_imgs), args.batch_size):
-        [np_sum_correct] = sess.run([train_sum_correct], feed_dict={handle: train_handle, learning_rate: 0.})
+        [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
             acc = total_correct / (jj + args.batch_size)
