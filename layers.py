@@ -73,6 +73,8 @@ class conv_block(layer):
         
         self.k, _, self.f1, self.f2 = shape
         self.p = p
+        self.pad = self.k // 2
+        
         self.noise = noise
         
         self.relu = relu
@@ -87,7 +89,8 @@ class conv_block(layer):
             assert (False)
 
     def train(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'SAME') + self.b
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
 
         if self.relu:
             out = tf.nn.relu(conv)
