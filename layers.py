@@ -25,10 +25,10 @@ class model:
     def __init__(self, layers):
         self.layers = layers
         
-    def train(self, x):
+    def train(self, x, scale):
         y = x
         for layer in self.layers:
-            y = layer.train(y)
+            y, scale = layer.train(y, scale)
         return y
     
     def collect(self, x):
@@ -89,6 +89,9 @@ class conv_block(layer):
         
         self.relu = relu
         
+        self.max = 0.
+        self.min = 0.
+        
         if weights:
             print (self.layer_id, shape, weights[self.layer_id].keys())
             f, b, s, scale, z = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
@@ -101,16 +104,22 @@ class conv_block(layer):
         else:
             assert (False)
 
-    def train(self, x):
+    def train(self, x, scale):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b
 
+        self.max = tf.maximum(tf.reduce_max(conv), self.max)
+        self.min = tf.minimum(tf.reduce_min(conv), self.min)
+
+        scale = (127 - (-128)) / (self.max - self.min)
+
         if self.relu:
+            # conv = tf.clip_by_value(tf.round(conv * scale), -128, 127)
             out = tf.nn.relu(conv)
         else:
             out = conv
 
-        return out
+        return out, scale
     
     def collect(self, x):
         assert (False)
@@ -136,6 +145,9 @@ class res_block1(layer):
         self.f2 = f2
         self.p = p
         self.noise = noise
+        
+        self.max = 0.
+        self.min = 0.
 
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -144,11 +156,20 @@ class res_block1(layer):
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
 
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
+    def train(self, x, scale):
+        y1, scale1 = self.conv1.train(x, 1)
+        y2, scale2 = self.conv2.train(y1, 1)
+        
+        self.max = tf.maximum(tf.reduce_max(y2), self.max)
+        self.max = tf.maximum(tf.reduce_max(x), self.max)
+        self.min = tf.minimum(tf.reduce_min(y2), self.min)
+        self.min = tf.minimum(tf.reduce_min(x), self.min)
+                
+        scale = (127 - (-128)) / (self.max - self.min)
+        # y2 = tf.clip_by_value(tf.round(y2 * scale), -128, 127)
+        
         y3 = tf.nn.relu(y2 + x)
-        return y3
+        return y3, scale
 
     def collect(self, x):
         assert (False)
@@ -179,6 +200,9 @@ class res_block2(layer):
         self.f2 = f2
         self.p = p
         self.noise = noise
+        
+        self.max = 0.
+        self.min = 0.
 
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -189,12 +213,22 @@ class res_block2(layer):
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
             self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None, relu=False)
 
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
-        y3 = self.conv3.train(x)
+    def train(self, x, scale):
+        y1, scale1 = self.conv1.train(x, 1)
+        y2, scale2 = self.conv2.train(y1, 1)
+        y3, scale3 = self.conv3.train(x, 1)
+        
+        self.max = tf.maximum(tf.reduce_max(y2), self.max)
+        self.max = tf.maximum(tf.reduce_max(y3), self.max)
+        self.min = tf.minimum(tf.reduce_min(y2), self.min)
+        self.min = tf.minimum(tf.reduce_min(y3), self.min)
+        
+        scale = (127 - (-128)) / (self.max - self.min)
+        # y2 = tf.clip_by_value(tf.round(y2 * scale), -128, 127)
+        # y3 = tf.clip_by_value(tf.round(y3 * scale), -128, 127)
+        
         y4 = tf.nn.relu(y2 + y3)
-        return y4
+        return y4, scale
 
     def collect(self, x):
         assert (False)
@@ -227,6 +261,9 @@ class dense_block(layer):
         self.osize = osize
         self.noise = noise
         
+        self.max = 0.
+        self.min = 0.
+        
         if weights:
             w, b, s, scale, z = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
@@ -238,10 +275,17 @@ class dense_block(layer):
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
-    def train(self, x):
+    def train(self, x, scale):
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w) * self.scale + self.b
-        return fc
+        
+        self.max = tf.maximum(tf.reduce_max(fc), self.max)
+        self.min = tf.minimum(tf.reduce_min(fc), self.min)
+
+        scale = (127 - (-128)) / (self.max - self.min)
+        # fc = tf.clip_by_value(tf.round(fc * scale), -128, 127)
+        
+        return fc, scale
     
     def collect(self, x):
         assert (False)
@@ -264,9 +308,9 @@ class avg_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x):        
+    def train(self, x, scale):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return pool
+        return pool, 1
     
     def collect(self, x):
         assert (False)
@@ -289,9 +333,9 @@ class max_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x):        
+    def train(self, x, scale):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return pool
+        return pool, 1
     
     def collect(self, x):
         assert (False)

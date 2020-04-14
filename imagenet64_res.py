@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--batch_size', type=int, default=8)
 args = parser.parse_args()
 
 ##############################################
@@ -77,7 +77,7 @@ dense_block(512, 1000, noise=None, weights=weights)
 # x_process = x_process / tf.math.reduce_std(x_process)
 
 def evaluate(x, y):
-    model_predict = tf.nn.softmax(m.train(x))
+    model_predict = m.train(x, 1)
     predict = tf.argmax(model_predict, axis=1)
     actual = tf.argmax(y, 1)
     correct = tf.equal(predict, actual)

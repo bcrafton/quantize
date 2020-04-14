@@ -60,7 +60,7 @@ conv_block((7,7,3,64), 2, noise=None, weights=weights),
 # x_process = x_process / tf.math.reduce_std(x_process)
 
 def evaluate(x):
-    model_predict = tf.nn.softmax(m.train(x))
+    model_predict = m.train(x)
     return model_predict
 
 def get_weights():
@@ -74,14 +74,13 @@ xs, ys = dataset['x'], dataset['y']
 xs = xs / 255. 
 xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
-# print (np.max(xs))
 xs = quantize_np(xs, -127, 127)
-# print (np.max(xs))
 
 ##################################################################
 
 xs = np.reshape(xs[0], (1,224,224,3)).astype(np.float32)
 y = evaluate(xs)
+
 print (np.max(y.numpy()))
 
 ##################################################################
