@@ -9,6 +9,16 @@ from bc_utils.init_tensor import init_matrix
 
 #############
 
+# if we want to train:
+# https://stackoverflow.com/questions/55764694/how-to-use-gradient-override-map-in-tensorflow-2-0
+
+def quantize(x, low, high):
+    scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+    x = x / scale
+    x = tf.floor(x)
+    x = tf.clip_by_value(x, low, high)
+    return x, scale
+
 #############
 
 class model:
@@ -81,22 +91,25 @@ class conv_block(layer):
         
         if weights:
             print (self.layer_id, shape, weights[self.layer_id].keys())
-            f, b = weights[self.layer_id]['f'], weights[self.layer_id]['b']
+            f, b, s, scale, z = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
             assert (np.shape(f) == shape)
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+            self.s = s
+            self.z = z
+            self.scale = tf.Variable(scale, dtype=tf.float32, trainable=False)
         else:
             assert (False)
 
     def train(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b
 
         if self.relu:
             out = tf.nn.relu(conv)
         else:
             out = conv
-        
+
         return out
     
     def collect(self, x):
@@ -215,16 +228,19 @@ class dense_block(layer):
         self.noise = noise
         
         if weights:
-            w, b = weights[self.layer_id]['w'], weights[self.layer_id]['b']
+            w, b, s, scale, z = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+            self.s = s
+            self.z = z
+            self.scale = tf.Variable(scale, dtype=tf.float32, trainable=False)
         else:
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
     def train(self, x):
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, self.w) + self.b
+        fc = tf.matmul(x, self.w) * self.scale + self.b
         return fc
     
     def collect(self, x):

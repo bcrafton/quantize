@@ -22,6 +22,9 @@ preprocess = transforms.Compose([
 input_tensor = preprocess(input_image)
 input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
 
+# scale = 255. / (torch.max(input_batch) - torch.min(input_batch))
+# input_batch = torch.floor(input_batch * scale)
+
 # move the input and model to GPU for speed if available
 if torch.cuda.is_available():
     input_batch = input_batch.to('cuda')
@@ -31,40 +34,17 @@ with torch.no_grad():
     output = model(input_batch)
     # output = torch.nn.functional.softmax(output[0], dim=0)
 
-image = input_tensor.detach().numpy().transpose(1,2,0)
-np.save('input_image', image)
-
-output = output.detach().numpy()
-output = output[0]
-# print (image[0,0,:])
-print (np.argmax(output))
-print (output[np.argmax(output)])
-print (output)
-
-# import matplotlib.pyplot as plt
-# plt.imshow(image)
-# plt.show()
-
-# print (dir(model.layer1))
-# print (dir(model.layer1[0].conv1))
-# print (model.layer1[0].conv1.features)
-
+print (torch.argmax(output))
 
 x = input_batch
-count = 0
 for layer in model.children():
-    x = layer(x)
-    a = np.transpose(x.detach().numpy(), (0, 2, 3, 1))
-    count += 1
-    if (count == 1): break
-
-np.save('ref', a)
-
+    y = layer(x)
+    break
+    
 import matplotlib.pyplot as plt
-a = a[0, :, :, 1]
-print (np.shape(a))
-print (a[0])
-plt.imshow(a)
+y = y.cpu().detach().numpy()
+y = y[0, 0, :, :]
+plt.imshow(y)
 plt.show()
 
 

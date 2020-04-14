@@ -45,23 +45,6 @@ weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
 
 m = model(layers=[
 conv_block((7,7,3,64), 2, noise=None, weights=weights),
-
-max_pool(2, 3),
-
-res_block1(64,   64, 1, noise=None, weights=weights),
-res_block1(64,   64, 1, noise=None, weights=weights),
-
-res_block2(64,   128, 2, noise=None, weights=weights),
-res_block1(128,  128, 1, noise=None, weights=weights),
-
-res_block2(128,  256, 2, noise=None, weights=weights),
-res_block1(256,  256, 1, noise=None, weights=weights),
-
-res_block2(256,  512, 2, noise=None, weights=weights),
-res_block1(512,  512, 1, noise=None, weights=weights),
-
-avg_pool(7, 7),
-dense_block(512, 1000, noise=None, weights=weights)
 ])
 
 # very helpful:
@@ -76,13 +59,9 @@ dense_block(512, 1000, noise=None, weights=weights)
 # x_process = tf.keras.applications.resnet50.preprocess_input(x_process)
 # x_process = x_process / tf.math.reduce_std(x_process)
 
-def evaluate(x, y):
+def evaluate(x):
     model_predict = tf.nn.softmax(m.train(x))
-    predict = tf.argmax(model_predict, axis=1)
-    actual = tf.argmax(y, 1)
-    correct = tf.equal(predict, actual)
-    sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-    return predict, actual, sum_correct
+    return model_predict
 
 def get_weights():
     return m.get_weights()
@@ -96,23 +75,14 @@ xs = xs / 255.
 xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
 # print (np.max(xs))
-# xs = quantize_np(xs, -127, 127)
+xs = quantize_np(xs, -127, 127)
 # print (np.max(xs))
 
-total_correct = 0
-for jj in range(0, 1024, args.batch_size):
-    s = jj
-    e = jj + args.batch_size
-    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e])
-    total_correct += correct
-    # print (y, yhat)
+##################################################################
 
-weights = get_weights()
-
-np.save('resnet18_weights_quant', weights)
-
-acc = total_correct / 1024
-print (acc)
+xs = np.reshape(xs[0], (1,224,224,3)).astype(np.float32)
+y = evaluate(xs)
+print (np.max(y.numpy()))
 
 ##################################################################
 
