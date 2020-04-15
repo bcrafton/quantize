@@ -165,15 +165,12 @@ class res_block1(layer):
         self.f2 = f2
         self.p = p
         self.noise = noise
-        
-        self.xmax = 0.
-        self.xmin = 0.
 
-        self.ymax = 0.
-        self.ymin = 0.
+        self.xsum1 = 0.
+        self.ysum1 = 0.
 
-        self.xsum = 0.
-        self.ysum = 0.
+        self.xsum2 = 0.
+        self.ysum2 = 0.
 
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -187,17 +184,16 @@ class res_block1(layer):
         y2 = self.conv2.train(y1, scale)
         
         if not scale:
-            self.xmax = tf.maximum(tf.reduce_max(x), self.xmax)
-            self.xmin = tf.minimum(tf.reduce_min(x), self.xmin)
-            self.ymax = tf.maximum(tf.reduce_max(y2), self.ymax)
-            self.ymin = tf.minimum(tf.reduce_min(y2), self.ymin)
-            self.xsum += tf.reduce_sum(tf.abs(x))
-            self.ysum += tf.reduce_sum(tf.abs(y2))
+            self.xsum1 += tf.reduce_sum(tf.abs(x))
+            self.ysum1 += tf.reduce_sum(tf.abs(y2))
             yscale = 1.
         else:
-            # yscale = (self.ymax - self.ymin) / (self.xmax - self.xmin)
-            yscale = self.ysum / self.xsum
-            # print (yscale)
+            self.xsum2 += tf.reduce_sum(tf.abs(x))
+            self.ysum2 += tf.reduce_sum(tf.abs(y2))
+            yscale1 = self.ysum1 / self.xsum1
+            yscale2 = self.ysum2 / self.xsum2
+            yscale = yscale1 / yscale2
+            # print (self.layer_num, yscale1, yscale2)
         
         y3 = tf.nn.relu(yscale * y2 + x)
         return y3
@@ -232,13 +228,11 @@ class res_block2(layer):
         self.p = p
         self.noise = noise
 
-        self.y2max = 0.
-        self.y2min = 0.
-        self.y2sum = 0.
+        self.y2sum1 = 0.
+        self.y2sum2 = 0.
         
-        self.y3max = 0.
-        self.y3min = 0.
-        self.y3sum = 0.
+        self.y3sum1 = 0.
+        self.y3sum2 = 0.
         
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -255,15 +249,16 @@ class res_block2(layer):
         y3 = self.conv3.train(x, scale)
         
         if not scale:
-            self.y2max = tf.maximum(tf.reduce_max(y2), self.y2max)
-            self.y2min = tf.minimum(tf.reduce_min(y2), self.y2min)
-            self.y2sum += tf.reduce_sum(tf.abs(y2))
-            self.y3max = tf.maximum(tf.reduce_max(y3), self.y3max)
-            self.y3min = tf.minimum(tf.reduce_min(y3), self.y3min)
-            self.y3sum += tf.reduce_sum(tf.abs(y3))
+            self.y2sum1 += tf.reduce_sum(tf.abs(y2))
+            self.y3sum1 += tf.reduce_sum(tf.abs(y3))
             yscale = 1.
         else:
-            yscale = self.y3sum / self.y2sum
+            self.y2sum2 += tf.reduce_sum(tf.abs(y2))
+            self.y3sum2 += tf.reduce_sum(tf.abs(y3))
+            yscale1 = self.y3sum1 / self.y2sum1
+            yscale2 = self.y3sum2 / self.y2sum2
+            yscale = yscale1 / yscale2
+            # print (yscale1, yscale2)
         
         y4 = tf.nn.relu(y2 + yscale * y3)
         return y4
