@@ -95,9 +95,7 @@ xs, ys = dataset['x'], dataset['y']
 xs = xs / 255. 
 xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
-# print (np.max(xs))
 # xs = quantize_np(xs, -127, 127)
-# print (np.max(xs))
 
 total_correct = 0
 for jj in range(0, 1024, args.batch_size):
@@ -106,14 +104,33 @@ for jj in range(0, 1024, args.batch_size):
     y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], False)
     total_correct += correct
 
-weights = get_weights()
-
-np.save('resnet18_weights_quant', weights)
-
 acc = total_correct / 1024
 print (acc)
 
 ##################################################################
 
+dataset = np.load('val_dataset.npy', allow_pickle=True).item()
+xs, ys = dataset['x'], dataset['y']
 
+xs = xs / 255. 
+xs = xs - np.array([0.485, 0.456, 0.406])
+xs = xs / np.array([0.229, 0.224, 0.225])
+xs = quantize_np(xs, -127, 127)
+
+total_correct = 0
+for jj in range(0, 1024, args.batch_size):
+    s = jj
+    e = jj + args.batch_size
+    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], True)
+    total_correct += correct
+    
+acc = total_correct / 1024
+print (acc)
+    
+##################################################################
+    
+    
+    
+    
+    
 
