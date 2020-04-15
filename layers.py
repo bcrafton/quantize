@@ -111,13 +111,14 @@ class conv_block(layer):
         if not scale:
             self.max1 = tf.maximum(tf.reduce_max(x), self.max1)
             self.min1 = tf.minimum(tf.reduce_min(x), self.min1)
+            x_scale = 1
         else:
             self.max2 = tf.maximum(tf.reduce_max(x), self.max2)
             self.min2 = tf.minimum(tf.reduce_min(x), self.min2)
-            # tf.clip_by_value(tf.round(fc * scale), -128, 127)
+            x_scale = (self.max2 - self.min2) / (self.max1 - self.min1)
     
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b * x_scale
 
         if self.relu:
             out = tf.nn.relu(conv)
