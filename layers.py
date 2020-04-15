@@ -95,8 +95,11 @@ class conv_block(layer):
         self.max2 = 0.
         self.min2 = 0.
         
-        self.ymin = 0.
-        self.ymax = 0.
+        self.ymin1 = 0.
+        self.ymax1 = 0.
+        
+        self.ymin2 = 0.
+        self.ymax2 = 0.
         
         if weights:
             # print (self.layer_id, shape, weights[self.layer_id].keys())
@@ -125,19 +128,22 @@ class conv_block(layer):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b * x_scale
 
-        if scale:
-            # y_scale = 127. / tf.maximum(tf.abs(self.max2), tf.abs(self.min2))
-            self.ymax = tf.maximum(tf.reduce_max(conv), self.ymax)
-            self.ymin = tf.minimum(tf.reduce_min(conv), self.ymin)
-            y_scale = 127. / tf.maximum(tf.abs(self.ymax), tf.abs(self.ymin))
-            conv = conv * y_scale
-            conv = tf.round(conv)
-            # print (tf.reduce_max(conv))
-
         if self.relu:
             out = tf.nn.relu(conv)
         else:
             out = conv
+
+        if not scale:
+            self.ymax1 = tf.maximum(tf.reduce_max(out), self.ymax1)
+            self.ymin1 = tf.minimum(tf.reduce_min(out), self.ymin1)
+        else:
+            self.ymax2 = tf.maximum(tf.reduce_max(out), self.ymax2)
+            self.ymin2 = tf.minimum(tf.reduce_min(out), self.ymin2)
+            y_scale = 127. / tf.maximum(tf.abs(self.ymax2), tf.abs(self.ymin2))
+            out = out * y_scale
+            out = tf.round(out)
+
+        # print (self.layer_id, self.ymax1)
 
         return out
     

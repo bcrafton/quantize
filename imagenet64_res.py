@@ -108,7 +108,7 @@ print (acc)
 
 ##################################################################
 
-for itr in range(5):
+for itr in range(3):
 
     dataset = np.load('val_dataset.npy', allow_pickle=True).item()
     xs, ys = dataset['x'], dataset['y']
