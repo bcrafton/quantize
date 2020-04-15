@@ -29,22 +29,18 @@ class model:
     def train(self, x, scale):
         y = x
         for layer in self.layers:
-            y = layer.train(y, scale, self.ymax)
+            y = layer.train(y, scale, self.ymax, 0)
         return y
     
-    def collect(self, x):
-        scale = {}
-        y = x 
-        for layer in self.layers:
-            y, s = layer.collect(y)
-            scale.update(s)
-        return y, scale
-
-    def predict(self, x):
+    def upto(self, x, n):
+        # print (n)        
         y = x
         for layer in self.layers:
-            y = layer.predict(y)
+            y = layer.train(y, True, self.ymax, n)
         return y
+
+    def predict(self, x):
+        assert (False)
 
     def set_ymax(self):
         for layer in self.layers:
@@ -112,14 +108,16 @@ class conv_block(layer):
         else:
             assert (False)
 
-    def train(self, x, scale, ymax):
+    def train(self, x, scale, ymax, nlayer):
         if not scale:
             self.max1 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max1)
+            self.max2 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max2)
             x_scale = 1
+        elif self.layer_num > nlayer:
+            x_scale = self.max2 / self.max1
         else:
             self.max2 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max2)
             x_scale = self.max2 / self.max1
-            # if self.layer_id == 0: print (x_scale, self.max2, self.max1)
     
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b * x_scale
@@ -131,13 +129,17 @@ class conv_block(layer):
 
         if not scale:
             self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
-        else:
+            self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
+            y_scale = 1
+        elif self.layer_num <= nlayer:
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
             y_scale = (127. / self.ymax2) * (self.ymax() / ymax)
-            # out = out * y_scale
-            # out = tf.round(out)
+            out = out * y_scale
+        else:
+            y_scale = (127. / self.ymax2) * (self.ymax() / ymax)
+            out = out * y_scale
 
-        print (self.layer_id, self.k, self.ymax1, self.ymax2, self.ymax2 / self.ymax1)
+        # print (self.layer_id, self.k, y_scale, self.ymax2, self.ymax1)
         # print (self.layer_id, self.k, self.max2, self.ymax2)
 
         return out
@@ -170,11 +172,8 @@ class res_block1(layer):
         self.p = p
         self.noise = noise
 
-        self.xsum1 = 0.
-        self.ysum1 = 0.
-
-        self.xsum2 = 0.
-        self.ysum2 = 0.
+        self.ymax1 = 0.
+        self.ymax2 = 0.
 
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -183,24 +182,11 @@ class res_block1(layer):
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
 
-    def train(self, x, scale, ymax):
-        y1 = self.conv1.train(x, scale, ymax)
-        y2 = self.conv2.train(y1, scale, ymax)
-                
-        if not scale:
-            self.xsum1 += tf.reduce_sum(tf.abs(x))
-            self.ysum1 += tf.reduce_sum(tf.abs(y2))
-            yscale = 1.
-        else:
-            self.xsum2 += tf.reduce_sum(tf.abs(x))
-            self.ysum2 += tf.reduce_sum(tf.abs(y2))
-            yscale1 = self.ysum1 / self.xsum1
-            yscale2 = self.ysum2 / self.xsum2
-            yscale = yscale1 / yscale2
-            # print (self.layer_num, yscale1, yscale2)
-        
+    def train(self, x, scale, ymax, nlayer):
+        y1 = self.conv1.train(x, scale, ymax, nlayer)
+        y2 = self.conv2.train(y1, scale, ymax, nlayer)        
         y3 = tf.nn.relu(y2 + x)
-        return y3
+        return y3 
 
     def collect(self, x):
         assert (False)
@@ -235,11 +221,8 @@ class res_block2(layer):
         self.p = p
         self.noise = noise
 
-        self.y2sum1 = 0.
-        self.y2sum2 = 0.
-        
-        self.y3sum1 = 0.
-        self.y3sum2 = 0.
+        self.ymax1 = 0.
+        self.ymax2 = 0.
         
         if weights:
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
@@ -250,25 +233,12 @@ class res_block2(layer):
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
             self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None, relu=False)
 
-    def train(self, x, scale, ymax):
-        y1 = self.conv1.train(x, scale, ymax)
-        y2 = self.conv2.train(y1, scale, ymax)
-        y3 = self.conv3.train(x, scale, ymax)
-
-        if not scale:
-            self.y2sum1 += tf.reduce_sum(tf.abs(y2))
-            self.y3sum1 += tf.reduce_sum(tf.abs(y3))
-            yscale = 1.
-        else:
-            self.y2sum2 += tf.reduce_sum(tf.abs(y2))
-            self.y3sum2 += tf.reduce_sum(tf.abs(y3))
-            yscale1 = self.y3sum1 / self.y2sum1
-            yscale2 = self.y3sum2 / self.y2sum2
-            yscale = yscale1 / yscale2
-            # print (yscale1, yscale2)
-        
+    def train(self, x, scale, ymax, nlayer):
+        y1 = self.conv1.train(x, scale, ymax, nlayer)
+        y2 = self.conv2.train(y1, scale, ymax, nlayer)
+        y3 = self.conv3.train(x, scale, ymax, nlayer)
         y4 = tf.nn.relu(y2 + y3)
-        return y4
+        return y4 
 
     def collect(self, x):
         assert (False)
@@ -305,10 +275,7 @@ class dense_block(layer):
         self.noise = noise
         
         self.max1 = 0.
-        self.min1 = 0.
-        
         self.max2 = 0.
-        self.min2 = 0.
         
         if weights:
             w, b, s, scale, z = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
@@ -321,15 +288,16 @@ class dense_block(layer):
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
-    def train(self, x, scale, ymax):
+    def train(self, x, scale, ymax, nlayer):
         if not scale:
-            self.max1 = tf.maximum(tf.reduce_max(x), self.max1)
-            self.min1 = tf.minimum(tf.reduce_min(x), self.min1)
+            self.max1 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max1)
+            self.max2 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max2)
             x_scale = 1
+        elif self.layer_num > nlayer:
+            x_scale = self.max2 / self.max1
         else:
-            self.max2 = tf.maximum(tf.reduce_max(x), self.max2)
-            self.min2 = tf.minimum(tf.reduce_min(x), self.min2)
-            x_scale = (self.max2 - self.min2) / (self.max1 - self.min1)
+            self.max2 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max2)
+            x_scale = self.max2 / self.max1
 
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w) * self.scale + self.b * x_scale
@@ -359,7 +327,7 @@ class avg_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x, scale, ymax):        
+    def train(self, x, scale, ymax, nlayer):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
@@ -387,7 +355,10 @@ class max_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x, scale, ymax):
+        self.ymax1 = 0.
+        self.ymax2 = 0.
+        
+    def train(self, x, scale, ymax, nlayer):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
@@ -398,7 +369,7 @@ class max_pool(layer):
         assert (False)
 
     def ymax(self):
-        return 0.
+        return self.ymax1
 
     def get_weights(self):
         weights_dict = {}

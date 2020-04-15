@@ -8,6 +8,7 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--nexamples', type=int, default=1024)
 args = parser.parse_args()
 
 ##############################################
@@ -82,7 +83,11 @@ def evaluate(x, y, scale):
     actual = tf.argmax(y, 1)
     correct = tf.equal(predict, actual)
     sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
-    return predict, actual, sum_correct
+    return sum_correct
+
+def collect(x, n):
+    model_predict = m.upto(x, n)
+    return model_predict
 
 def get_weights():
     return m.get_weights()
@@ -97,13 +102,13 @@ xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
 
 total_correct = 0
-for jj in range(0, 1024, args.batch_size):
+for jj in range(0, args.nexamples, args.batch_size):
     s = jj
     e = jj + args.batch_size
-    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], False)
+    correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], False)
     total_correct += correct
 
-acc = total_correct / 1024
+acc = total_correct / args.nexamples
 print (acc)
 
 ##################################################################
@@ -113,26 +118,48 @@ print (m.ymax)
 
 ##################################################################
 
-for itr in range(3):
+dataset = np.load('val_dataset.npy', allow_pickle=True).item()
+xs, ys = dataset['x'], dataset['y']
 
-    dataset = np.load('val_dataset.npy', allow_pickle=True).item()
-    xs, ys = dataset['x'], dataset['y']
+xs = xs / 255.
+xs = xs - np.array([0.485, 0.456, 0.406])
+xs = xs / np.array([0.229, 0.224, 0.225])
+xs, scale = quantize_np(xs)
 
-    xs = xs / 255.
-    xs = xs - np.array([0.485, 0.456, 0.406])
-    xs = xs / np.array([0.229, 0.224, 0.225])
-    xs, scale = quantize_np(xs)
-    total_correct = 0
-    for jj in range(0, 1024, args.batch_size):
+for n in range(30):
+    for jj in range(0, args.nexamples, args.batch_size):
         s = jj
         e = jj + args.batch_size
-        y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], True)
-        total_correct += correct
-        
-    acc = total_correct / 1024
-    print (acc)
+        p = collect(xs[s:e].astype(np.float32), n)
     
 ##################################################################
+
+dataset = np.load('val_dataset.npy', allow_pickle=True).item()
+xs, ys = dataset['x'], dataset['y']
+
+xs = xs / 255. 
+xs = xs - np.array([0.485, 0.456, 0.406])
+xs = xs / np.array([0.229, 0.224, 0.225])
+xs, scale = quantize_np(xs)
+
+total_correct = 0
+for jj in range(0, args.nexamples, args.batch_size):
+    s = jj
+    e = jj + args.batch_size
+    correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], True)
+    total_correct += correct
+
+acc = total_correct / args.nexamples
+print (acc)
+
+##################################################################
+
+
+
+
+
+
+
 
 
 
