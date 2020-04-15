@@ -95,10 +95,7 @@ class conv_block(layer):
         self.max2 = 0.
         self.min2 = 0.
         
-        self.ymin1 = 0.
         self.ymax1 = 0.
-        
-        self.ymin2 = 0.
         self.ymax2 = 0.
         
         if weights:
@@ -134,16 +131,14 @@ class conv_block(layer):
             out = conv
 
         if not scale:
-            self.ymax1 = tf.maximum(tf.reduce_max(out), self.ymax1)
-            self.ymin1 = tf.minimum(tf.reduce_min(out), self.ymin1)
+            self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
         else:
-            self.ymax2 = tf.maximum(tf.reduce_max(out), self.ymax2)
-            self.ymin2 = tf.minimum(tf.reduce_min(out), self.ymin2)
-            y_scale = 127. / tf.maximum(tf.abs(self.ymax2), tf.abs(self.ymin2))
+            self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
+            y_scale = 127. / self.ymax2
             out = out * y_scale
             out = tf.round(out)
 
-        # print (self.layer_id, self.ymax1)
+        print (self.layer_id, self.k, self.ymax1, self.ymax2)
 
         return out
     
@@ -188,7 +183,7 @@ class res_block1(layer):
     def train(self, x, scale):
         y1 = self.conv1.train(x, scale)
         y2 = self.conv2.train(y1, scale)
-        
+                
         if not scale:
             self.xsum1 += tf.reduce_sum(tf.abs(x))
             self.ysum1 += tf.reduce_sum(tf.abs(y2))
@@ -253,7 +248,7 @@ class res_block2(layer):
         y1 = self.conv1.train(x, scale)
         y2 = self.conv2.train(y1, scale)
         y3 = self.conv3.train(x, scale)
-        
+
         if not scale:
             self.y2sum1 += tf.reduce_sum(tf.abs(y2))
             self.y3sum1 += tf.reduce_sum(tf.abs(y3))
