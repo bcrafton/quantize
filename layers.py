@@ -263,13 +263,14 @@ class dense_block(layer):
         if not scale:
             self.max1 = tf.maximum(tf.reduce_max(x), self.max1)
             self.min1 = tf.minimum(tf.reduce_min(x), self.min1)
+            x_scale = 1
         else:
             self.max2 = tf.maximum(tf.reduce_max(x), self.max2)
             self.min2 = tf.minimum(tf.reduce_min(x), self.min2)
-            # tf.clip_by_value(tf.round(fc * scale), -128, 127)
+            x_scale = (self.max2 - self.min2) / (self.max1 - self.min1)
 
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, self.w) * self.scale + self.b
+        fc = tf.matmul(x, self.w) * self.scale + self.b * x_scale
         return fc
     
     def collect(self, x):
