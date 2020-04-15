@@ -115,7 +115,7 @@ xs, ys = dataset['x'], dataset['y']
 xs = xs / 255. 
 xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
-xs = quantize_np(xs, -127, 127)
+xs = quantize_np(xs, -128, 127)
 
 total_correct = 0
 for jj in range(0, 1024, args.batch_size):
