@@ -7,7 +7,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--batch_size', type=int, default=64)
 args = parser.parse_args()
 
 ##############################################
@@ -108,7 +108,12 @@ print (acc)
 
 ##################################################################
 
-for itr in range(1):
+m.set_ymax()
+print (m.ymax)
+
+##################################################################
+
+for itr in range(3):
 
     dataset = np.load('val_dataset.npy', allow_pickle=True).item()
     xs, ys = dataset['x'], dataset['y']

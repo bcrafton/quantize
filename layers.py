@@ -24,11 +24,12 @@ def quantize(x, low, high):
 class model:
     def __init__(self, layers):
         self.layers = layers
+        self.ymax = 0.
         
     def train(self, x, scale):
         y = x
         for layer in self.layers:
-            y = layer.train(y, scale)
+            y = layer.train(y, scale, self.ymax)
         return y
     
     def collect(self, x):
@@ -44,7 +45,11 @@ class model:
         for layer in self.layers:
             y = layer.predict(y)
         return y
-        
+
+    def set_ymax(self):
+        for layer in self.layers:
+            self.ymax = tf.maximum(self.ymax, layer.ymax())
+
     def get_weights(self):
         weights_dict = {}
         for layer in self.layers:
@@ -90,10 +95,7 @@ class conv_block(layer):
         self.relu = relu
         
         self.max1 = 0.
-        self.min1 = 0.
-        
         self.max2 = 0.
-        self.min2 = 0.
         
         self.ymax1 = 0.
         self.ymax2 = 0.
@@ -110,15 +112,12 @@ class conv_block(layer):
         else:
             assert (False)
 
-    def train(self, x, scale):
+    def train(self, x, scale, ymax):
         if not scale:
-            self.max1 = tf.maximum(tf.reduce_max(x), self.max1)
-            self.min1 = tf.minimum(tf.reduce_min(x), self.min1)
+            self.max1 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max1)
             x_scale = 1
         else:
-            self.max2 = tf.maximum(tf.reduce_max(x), self.max2)
-            self.min2 = tf.minimum(tf.reduce_min(x), self.min2)
-            # x_scale = (self.max2 - self.min2) / (self.max1 - self.min1)
+            self.max2 = tf.maximum(tf.reduce_max(tf.abs(x)), self.max2)
             x_scale = self.max2 / self.max1
             # if self.layer_id == 0: print (x_scale, self.max2, self.max1)
     
@@ -134,11 +133,12 @@ class conv_block(layer):
             self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
         else:
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
-            y_scale = 127. / self.ymax2
-            out = out * y_scale
-            out = tf.round(out)
+            y_scale = (127. / self.ymax2) * (self.ymax() / ymax)
+            # out = out * y_scale
+            # out = tf.round(out)
 
-        print (self.layer_id, self.k, self.ymax1, self.ymax2)
+        print (self.layer_id, self.k, self.ymax1, self.ymax2, self.ymax2 / self.ymax1)
+        # print (self.layer_id, self.k, self.max2, self.ymax2)
 
         return out
     
@@ -147,6 +147,9 @@ class conv_block(layer):
 
     def predict(self, x):
         assert (False)
+        
+    def ymax(self):
+        return self.ymax1
 
     def get_weights(self):
         weights_dict = {}
@@ -180,9 +183,9 @@ class res_block1(layer):
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
 
-    def train(self, x, scale):
-        y1 = self.conv1.train(x, scale)
-        y2 = self.conv2.train(y1, scale)
+    def train(self, x, scale, ymax):
+        y1 = self.conv1.train(x, scale, ymax)
+        y2 = self.conv2.train(y1, scale, ymax)
                 
         if not scale:
             self.xsum1 += tf.reduce_sum(tf.abs(x))
@@ -196,7 +199,7 @@ class res_block1(layer):
             yscale = yscale1 / yscale2
             # print (self.layer_num, yscale1, yscale2)
         
-        y3 = tf.nn.relu(yscale * y2 + x)
+        y3 = tf.nn.relu(y2 + x)
         return y3
 
     def collect(self, x):
@@ -204,6 +207,9 @@ class res_block1(layer):
 
     def predict(self, x):
         assert (False)
+        
+    def ymax(self):
+        return tf.maximum(self.conv1.ymax(), self.conv2.ymax())
 
     def get_weights(self):
         weights_dict = {}
@@ -244,10 +250,10 @@ class res_block2(layer):
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
             self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None, relu=False)
 
-    def train(self, x, scale):
-        y1 = self.conv1.train(x, scale)
-        y2 = self.conv2.train(y1, scale)
-        y3 = self.conv3.train(x, scale)
+    def train(self, x, scale, ymax):
+        y1 = self.conv1.train(x, scale, ymax)
+        y2 = self.conv2.train(y1, scale, ymax)
+        y3 = self.conv3.train(x, scale, ymax)
 
         if not scale:
             self.y2sum1 += tf.reduce_sum(tf.abs(y2))
@@ -261,7 +267,7 @@ class res_block2(layer):
             yscale = yscale1 / yscale2
             # print (yscale1, yscale2)
         
-        y4 = tf.nn.relu(y2 + yscale * y3)
+        y4 = tf.nn.relu(y2 + y3)
         return y4
 
     def collect(self, x):
@@ -269,6 +275,9 @@ class res_block2(layer):
 
     def predict(self, x):
         assert (False)
+        
+    def ymax(self):
+        return tf.maximum(tf.maximum(self.conv1.ymax(), self.conv2.ymax()), self.conv3.ymax())
 
     def get_weights(self):
         weights_dict = {}
@@ -312,7 +321,7 @@ class dense_block(layer):
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
         
-    def train(self, x, scale):
+    def train(self, x, scale, ymax):
         if not scale:
             self.max1 = tf.maximum(tf.reduce_max(x), self.max1)
             self.min1 = tf.minimum(tf.reduce_min(x), self.min1)
@@ -331,6 +340,9 @@ class dense_block(layer):
 
     def predict(self, x):
         assert (False)
+        
+    def ymax(self):
+        return 0.
 
     def get_weights(self):
         weights_dict = {}
@@ -347,7 +359,7 @@ class avg_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x, scale):        
+    def train(self, x, scale, ymax):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
@@ -356,6 +368,9 @@ class avg_pool(layer):
 
     def predict(self, x):
         assert (False)
+        
+    def ymax(self):
+        return 0.
 
     def get_weights(self):
         weights_dict = {}
@@ -372,7 +387,7 @@ class max_pool(layer):
         self.s = s
         self.p = p
         
-    def train(self, x, scale):
+    def train(self, x, scale, ymax):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
@@ -381,6 +396,9 @@ class max_pool(layer):
 
     def predict(self, x):
         assert (False)
+
+    def ymax(self):
+        return 0.
 
     def get_weights(self):
         weights_dict = {}
