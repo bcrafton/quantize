@@ -76,8 +76,8 @@ dense_block(512, 1000, noise=None, weights=weights)
 # x_process = tf.keras.applications.resnet50.preprocess_input(x_process)
 # x_process = x_process / tf.math.reduce_std(x_process)
 
-def evaluate(x, y):
-    model_predict = m.train(x, 1)
+def evaluate(x, y, scale):
+    model_predict = m.train(x, scale)
     predict = tf.argmax(model_predict, axis=1)
     actual = tf.argmax(y, 1)
     correct = tf.equal(predict, actual)
@@ -103,9 +103,8 @@ total_correct = 0
 for jj in range(0, 1024, args.batch_size):
     s = jj
     e = jj + args.batch_size
-    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e])
+    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], False)
     total_correct += correct
-    # print (y, yhat)
 
 weights = get_weights()
 
