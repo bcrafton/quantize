@@ -29,7 +29,7 @@ class model:
     def train(self, x, scale):
         y = x
         for layer in self.layers:
-            y = layer.train(y, scale, self.ymax, 0)
+            y = layer.train(y, scale, self.ymax, -1)
         return y
     
     def upto(self, x, n):
@@ -128,6 +128,7 @@ class conv_block(layer):
             conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b / self.scale * x_scale 
         else:
             conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + tf.round(self.b / self.scale * x_scale)
+            self.b_scale = tf.round(self.b / self.scale * x_scale)
 
         if self.relu:
             out = tf.nn.relu(conv)
@@ -139,23 +140,22 @@ class conv_block(layer):
             self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
             y_scale = 1
-        elif self.layer_num <= nlayer:
+        elif self.layer_num > nlayer:
+            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
+            self.y_scale = tf.round(1. / (y_scale * self.scale))
+            out = out / tf.round(1. / (y_scale * self.scale))
+            out = tf.clip_by_value(tf.round(out), -128, 127)
+            self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
+        else:
             out = out * self.scale
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
             y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
             out = out * y_scale
             # out = tf.round(out)
             self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
-        else:
-            # out = out * self.scale
-            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
-            # out = out * y_scale * self.scale
-            out = out / tf.round(1. / (y_scale * self.scale))
-            out = tf.clip_by_value(tf.round(out), -128, 127)
-            self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
 
         # if self.layer_num == nlayer: print (self.layer_num, self.k, self.ymax1, self.ymax2, self.ymax3)
-        if self.layer_num == nlayer: print (self.layer_num, x_scale, y_scale, tf.reduce_max(y_scale * self.scale), tf.reduce_max(self.b / self.scale * x_scale))
+        # if self.layer_num == nlayer: print (self.layer_num, x_scale, y_scale, tf.reduce_max(y_scale * self.scale), tf.reduce_max(self.b / self.scale * x_scale))
 
         return out
     
@@ -170,7 +170,7 @@ class conv_block(layer):
 
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_num] = {'f': self.f.numpy(), 'b': self.b.numpy()}
+        weights_dict[self.layer_num] = {'f': self.f.numpy(), 'b': self.b_scale.numpy(), 'y': self.y_scale.numpy()}
         return weights_dict
         
 #############
@@ -315,8 +315,19 @@ class dense_block(layer):
             x_scale = self.max2 / self.max1
 
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
-        fc = fc * self.scale
+        # fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
+        # fc = fc * self.scale
+        
+        if not scale:
+            fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
+            fc = fc * self.scale
+        else:
+            fc = tf.matmul(x, self.w) + tf.round(self.b / self.scale * x_scale)
+            fc = fc / tf.round(1. / self.scale)
+            self.b_scale = tf.round(self.b / self.scale * x_scale)
+            self.y_scale = tf.round(1. / self.scale)
+        
+        # if self.layer_num == nlayer: print (1. / self.scale)
         return fc
     
     def collect(self, x):
@@ -330,7 +341,7 @@ class dense_block(layer):
 
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_num] = {'w': self.w.numpy(), 'b': self.b.numpy()}
+        weights_dict[self.layer_num] = {'w': self.w.numpy(), 'b': self.b_scale.numpy(), 'y': self.y_scale.numpy()}
         return weights_dict
 
 #############

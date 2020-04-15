@@ -126,7 +126,7 @@ xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
 xs, scale = quantize_np(xs)
 
-for n in range(30):
+for n in range(31):
     for jj in range(0, args.nexamples, args.batch_size):
         s = jj
         e = jj + args.batch_size
@@ -154,9 +154,17 @@ print (acc)
 
 ##################################################################
 
+# weight_dict = sess.run(weights, feed_dict={})
 
+weight_dict = get_weights()
 
+for key in weight_dict.keys():
+    print (weight_dict[key].keys())
 
+# weight_dict['acc'] = acc
+np.save('resnet18_quant_weights', weight_dict)
+
+##################################################################
 
 
 
