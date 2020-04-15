@@ -46,7 +46,7 @@ class model:
         for layer in self.layers:
             self.ymax = tf.maximum(self.ymax, layer.ymax())
             
-        self.ymax = 12.
+        self.ymax = 14.
 
     def get_weights(self):
         weights_dict = {}
@@ -123,7 +123,7 @@ class conv_block(layer):
             x_scale = self.max2 / self.max1
     
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') * self.scale + self.b * x_scale
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b / self.scale * x_scale 
 
         if self.relu:
             out = tf.nn.relu(conv)
@@ -131,23 +131,23 @@ class conv_block(layer):
             out = conv
 
         if not scale:
+            out = out * self.scale
             self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
-            y_scale = 1
         elif self.layer_num <= nlayer:
+            out = out * self.scale
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
             y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
             out = out * y_scale
             # out = tf.round(out)
             self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
         else:
+            out = out * self.scale
             y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
-            out = out * y_scale
             out = tf.clip_by_value(tf.round(out), -128, 127)
             self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
 
-        # print (self.layer_id, self.k, y_scale, self.ymax2, self.ymax1)
-        print (self.layer_id, self.k, y_scale, self.ymax1, self.ymax2, self.ymax3)
+        print (self.layer_id, self.k, self.ymax1, self.ymax2, self.ymax3)
 
         return out
     
@@ -307,7 +307,8 @@ class dense_block(layer):
             x_scale = self.max2 / self.max1
 
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, self.w) * self.scale + self.b * x_scale
+        fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
+        fc = fc * self.scale
         return fc
     
     def collect(self, x):
