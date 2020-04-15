@@ -27,12 +27,12 @@ gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 
-def quantize_np(x, low, high):
-  scale = (np.max(x) - np.min(x)) / (high - low)
-  x = x / scale
-  x = np.floor(x)
-  x = np.clip(x, low, high)
-  return x
+def quantize_np(x):
+  scale = 127. / np.max(np.absolute(x))
+  x = x * scale
+  # x = np.floor(x)
+  # x = np.clip(x, low, high)
+  return x, scale
 
 ###############################################################
 
@@ -95,7 +95,6 @@ xs, ys = dataset['x'], dataset['y']
 xs = xs / 255. 
 xs = xs - np.array([0.485, 0.456, 0.406])
 xs = xs / np.array([0.229, 0.224, 0.225])
-# xs = quantize_np(xs, -127, 127)
 
 total_correct = 0
 for jj in range(0, 1024, args.batch_size):
@@ -109,28 +108,28 @@ print (acc)
 
 ##################################################################
 
-dataset = np.load('val_dataset.npy', allow_pickle=True).item()
-xs, ys = dataset['x'], dataset['y']
+for itr in range(3):
 
-xs = xs / 255. 
-xs = xs - np.array([0.485, 0.456, 0.406])
-xs = xs / np.array([0.229, 0.224, 0.225])
-xs = quantize_np(xs, -128, 127)
+    dataset = np.load('val_dataset.npy', allow_pickle=True).item()
+    xs, ys = dataset['x'], dataset['y']
 
-total_correct = 0
-for jj in range(0, 1024, args.batch_size):
-    s = jj
-    e = jj + args.batch_size
-    y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], True)
-    total_correct += correct
-    
-acc = total_correct / 1024
-print (acc)
+    xs = xs / 255.
+    xs = xs - np.array([0.485, 0.456, 0.406])
+    xs = xs / np.array([0.229, 0.224, 0.225])
+    xs, scale = quantize_np(xs)
+    total_correct = 0
+    for jj in range(0, 1024, args.batch_size):
+        s = jj
+        e = jj + args.batch_size
+        y, yhat, correct = evaluate(xs[s:e].astype(np.float32), ys[s:e], True)
+        total_correct += correct
+        
+    acc = total_correct / 1024
+    print (acc)
     
 ##################################################################
-    
-    
-    
-    
-    
+
+
+
+
 
