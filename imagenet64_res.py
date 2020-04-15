@@ -28,10 +28,10 @@ for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 
 def quantize_np(x):
-  scale = 127. / np.max(np.absolute(x))
+  scale = 127 / np.max(np.absolute(x))
   x = x * scale
-  # x = np.floor(x)
-  # x = np.clip(x, low, high)
+  x = np.round(x)
+  x = np.clip(x, -127, 127)
   return x, scale
 
 ###############################################################
@@ -108,7 +108,7 @@ print (acc)
 
 ##################################################################
 
-for itr in range(3):
+for itr in range(5):
 
     dataset = np.load('val_dataset.npy', allow_pickle=True).item()
     xs, ys = dataset['x'], dataset['y']

@@ -131,7 +131,7 @@ class conv_block(layer):
             self.ymin = tf.minimum(tf.reduce_min(conv), self.ymin)
             y_scale = 127. / tf.maximum(tf.abs(self.ymax), tf.abs(self.ymin))
             conv = conv * y_scale
-            # conv = tf.round(conv)
+            conv = tf.round(conv)
             # print (tf.reduce_max(conv))
 
         if self.relu:
