@@ -45,6 +45,8 @@ class model:
     def set_ymax(self):
         for layer in self.layers:
             self.ymax = tf.maximum(self.ymax, layer.ymax())
+            
+        self.ymax = 12.
 
     def get_weights(self):
         weights_dict = {}
@@ -95,6 +97,7 @@ class conv_block(layer):
         
         self.ymax1 = 0.
         self.ymax2 = 0.
+        self.ymax3 = 0.
         
         if weights:
             # print (self.layer_id, shape, weights[self.layer_id].keys())
@@ -133,14 +136,18 @@ class conv_block(layer):
             y_scale = 1
         elif self.layer_num <= nlayer:
             self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
-            y_scale = (127. / self.ymax2) * (self.ymax() / ymax)
+            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
             out = out * y_scale
+            # out = tf.round(out)
+            self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
         else:
-            y_scale = (127. / self.ymax2) * (self.ymax() / ymax)
+            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
             out = out * y_scale
+            out = tf.clip_by_value(tf.round(out), -128, 127)
+            self.ymax3 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax3)
 
         # print (self.layer_id, self.k, y_scale, self.ymax2, self.ymax1)
-        # print (self.layer_id, self.k, self.max2, self.ymax2)
+        print (self.layer_id, self.k, y_scale, self.ymax1, self.ymax2, self.ymax3)
 
         return out
     
