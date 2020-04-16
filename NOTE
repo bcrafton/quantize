@@ -1,0 +1,6 @@
+
+if we want additional accuracy
+I believe you can stop quantizing based on 14.
+and quantize all layers to -128, 127
+BUT
+then quantize the two residuals based on profiled data.
