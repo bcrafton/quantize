@@ -7,9 +7,9 @@ import time
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=5e-4)
+parser.add_argument('--lr', type=float, default=2e-4)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--name', type=str, default='imagenet224')
@@ -280,14 +280,14 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-for ii in range(0, 1):
+for ii in range(0, args.epochs):
     print('epoch %d/%d' % (ii, args.epochs))
 
     sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
     total_correct = 0
     start = time.time()
-    for jj in range(0, 250000, args.batch_size):
+    for jj in range(0, 200000, args.batch_size):
         [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
