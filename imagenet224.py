@@ -89,7 +89,7 @@ def train_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
     
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
 
     return image, label
@@ -113,7 +113,7 @@ def val_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
 
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
 
     return image, label
@@ -287,7 +287,7 @@ for ii in range(0, args.epochs):
 
     total_correct = 0
     start = time.time()
-    for jj in range(0, 200000, args.batch_size):
+    for jj in range(0, len(train_imgs), args.batch_size):
         [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
         total_correct += np_sum_correct
         if (jj % (100 * args.batch_size) == 0):
@@ -301,7 +301,7 @@ for ii in range(0, args.epochs):
 sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
 # MAKE SURE THIS IS SET CORRECTLY!!!
-collect_examples = 1000 * args.batch_size
+collect_examples = 5000 * args.batch_size
 
 scales = []
 total_correct = 0

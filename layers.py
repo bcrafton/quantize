@@ -30,12 +30,19 @@ def quantize(x, low, high):
         x = tf.clip_by_value(x, low, high)
         return x, scale
         
+'''
 def dequantize(x, low, high):
     g = tf.get_default_graph()
     with g.gradient_override_map({"Floor": "Identity"}):
         scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
         x = x * scale
         return x
+'''
+
+def dequantize(x, low, high):
+    scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+    x = x * scale
+    return x
     
 def quantize_predict(x, scale, low, high):
     x = x / scale
@@ -137,7 +144,7 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
         qf = quantize_and_dequantize(fold_f, -128, 127)
-        qb = quantize_and_dequantize(fold_b, -2**24, 2**24-1)
+        qb = quantize_and_dequantize(fold_b, -2**28, 2**28-1)
 
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
 
@@ -158,8 +165,8 @@ class conv_block(layer):
         std = tf.sqrt(var + 1e-5)
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
-        qf, sf = quantize(fold_f, -128, 127)
-        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
+        qf = quantize_and_dequantize(fold_f, -128, 127)
+        qb = quantize_and_dequantize(fold_b, -2**28, 2**28-1)
         
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
 
@@ -168,15 +175,18 @@ class conv_block(layer):
         else:
             out = conv
 
-        qout, sout = quantize(out, -128, 127)
+        qout = quantize_and_dequantize(out, -128, 127)
+        _, sout = quantize(out, -128, 127)
         return qout, {self.layer_id: {'scale': sout, 'std': std, 'mean': mean}}
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
 
-        qf, sf = quantize(self.f, -128, 127)
-        qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
-        
+        # qf, sf = quantize(self.f, -128, 127)
+        # qb = quantize_predict(self.b, sf, -2**28, 2**28-1)
+        qf = quantize_and_dequantize(self.f, -128, 127)
+        qb = quantize_and_dequantize(self.b, -2**28, 2**28-1)
+
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
 
         if self.relu:
@@ -184,7 +194,8 @@ class conv_block(layer):
         else:
             out = conv
         
-        qout = quantize_predict(out, self.q, -128, 127)
+        # qout = quantize_predict(out, self.q, -128, 127)
+        qout = quantize_and_dequantize(out, -128, 127)
         return qout
         
     def get_weights(self):
@@ -336,7 +347,7 @@ class dense_block(layer):
         
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
-        qb = quantize_and_dequantize(self.b, -2**24, 2**24-1)
+        qb = quantize_and_dequantize(self.b, -2**28, 2**28-1)
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
@@ -344,30 +355,32 @@ class dense_block(layer):
         return qfc
     
     def collect(self, x):
-        qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
+        # qw, sw = quantize(self.w, -128, 127)
+        # qb = quantize_predict(self.b, sw, -2**28, 2**28-1)
+        qw = quantize_and_dequantize(self.w, -128, 127)
+        qb = quantize_and_dequantize(self.b, -2**28, 2**28-1)
 
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
-        qfc, sfc = quantize(fc, -128, 127)
+        qfc = quantize_and_dequantize(fc, -128, 127)
+        _, sfc = quantize(fc, -128, 127)
         return qfc, {self.layer_id: {'scale': sfc}}
 
     def predict(self, x):
-        qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
-        
+        # qw, sw = quantize(self.w, -128, 127)
+        # qb = quantize_predict(self.b, sw, -2**28, 2**28-1)
+        qw = quantize_and_dequantize(self.w, -128, 127)
+        qb = quantize_and_dequantize(self.b, -2**28, 2**28-1)
+
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
-        qfc = quantize_predict(fc, self.q, -128, 127)
+        # qfc = quantize_predict(fc, self.q, -128, 127)
+        qfc = quantize_and_dequantize(fc, -128, 127)
         return qfc
         
     def get_weights(self):
-        qw, _ = quantize(self.w, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
-    
         weights_dict = {}
-        weights_dict[self.layer_id] = {'w': qw, 'b': qb}
-        
+        weights_dict[self.layer_id] = {'w': self.w, 'b': self.b}
         return weights_dict
 
 #############

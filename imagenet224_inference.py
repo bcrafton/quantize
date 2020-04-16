@@ -89,7 +89,7 @@ def train_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
     
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
 
     return image, label
@@ -113,8 +113,10 @@ def val_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
 
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
+
+    # image = tf.Print(image, [tf.math.reduce_std(image)], message='', summarize=1000)
 
     return image, label
 
@@ -264,16 +266,34 @@ val_handle = sess.run(val_iterator.string_handle())
 
 sess.run(val_iterator.initializer, feed_dict={filename: val_imgs, label: val_labs})
 
+# xs = []
+# ys = []
+
 total_correct = 0
 start = time.time()
 for jj in range(0, len(val_imgs), args.batch_size):
+    # [np_sum_correct, x, y] = sess.run([sum_correct, features, labels], feed_dict={handle: val_handle})
     [np_sum_correct] = sess.run([sum_correct], feed_dict={handle: val_handle})
     total_correct += np_sum_correct
+
+    '''
+    if len(xs) < 32:
+        xs.append(x)
+        ys.append(y)
+    '''
+
     if (jj % (100 * args.batch_size) == 0):
         acc = total_correct / (jj + args.batch_size)
         img_per_sec = (jj + args.batch_size) / (time.time() - start)
         p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
         print (p)
+
+'''
+xs = np.concatenate(xs, axis=0)
+ys = np.concatenate(ys, axis=0)
+val_dataset = {'x': xs, 'y': ys}
+np.save('val_dataset', val_dataset)
+'''
 
 ##################################################################
 
