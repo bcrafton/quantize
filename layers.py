@@ -170,7 +170,7 @@ class conv_block(layer):
 
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_num] = {'f': self.f.numpy(), 'b': self.b_scale.numpy(), 'y': self.y_scale.numpy()}
+        weights_dict[self.layer_num] = { 'f': self.f.numpy().astype(np.int32), 'b': self.b_scale.numpy().astype(np.int32), 'y': self.y_scale.numpy().astype(np.int32) }
         return weights_dict
         
 #############
@@ -341,7 +341,7 @@ class dense_block(layer):
 
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_num] = {'w': self.w.numpy(), 'b': self.b_scale.numpy(), 'y': self.y_scale.numpy()}
+        weights_dict[self.layer_num] = { 'w': self.w.numpy().astype(np.int32), 'b': self.b_scale.numpy().astype(np.int32), 'y': self.y_scale.numpy().astype(np.int32) }
         return weights_dict
 
 #############
