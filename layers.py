@@ -11,12 +11,28 @@ from bc_utils.init_tensor import init_matrix
 
 # if we want to train:
 # https://stackoverflow.com/questions/55764694/how-to-use-gradient-override-map-in-tensorflow-2-0
-
+'''
 def quantize(x, low, high):
     scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
     x = x / scale
     x = tf.floor(x)
     x = tf.clip_by_value(x, low, high)
+    return x, scale
+'''
+
+def quantize(x):
+    scale = (np.max(x) - np.min(x)) / (high - low)
+    x = x / scale
+    x = np.floor(x)
+    x = np.clip(x, low, high)
+    return x, scale
+
+def quantize_and_dequantize(x, low, high):
+    scale = (np.max(x) - np.min(x)) / (high - low)
+    x = x / scale
+    x = np.floor(x)
+    x = np.clip(x, low, high)
+    x = x * scale
     return x, scale
 
 #############
@@ -100,13 +116,14 @@ class conv_block(layer):
         self.ymax3 = 0.
         
         if weights:
-            # print (self.layer_id, shape, weights[self.layer_id].keys())
-            f, b, s, scale, z = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
+            f, b = weights[self.layer_num]['f'], weights[self.layer_num]['b']
+            f, scale = quantize_and_dequantize(f, -128, 127)
+            b, _ = quantize_and_dequantize(b, -2**28, 2**28-1)
+            f = f / scale
+            b = b / scale
             assert (np.shape(f) == shape)
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.s = s
-            self.z = z
             self.scale = tf.Variable(scale, dtype=tf.float32, trainable=False)
         else:
             assert (False)
@@ -125,10 +142,10 @@ class conv_block(layer):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         
         if not scale:
-            conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b / self.scale * x_scale 
+            conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b * x_scale 
         else:
-            conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + tf.round(self.b / self.scale * x_scale)
-            self.b_scale = tf.round(self.b / self.scale * x_scale)
+            conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + tf.round(self.b * x_scale)
+            self.b_scale = tf.round(self.b * x_scale)
 
         if self.relu:
             out = tf.nn.relu(conv)
@@ -194,8 +211,7 @@ class res_block1(layer):
             self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=weights)
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights, relu=False)
         else:
-            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
+            assert (False)
 
     def train(self, x, scale, ymax, nlayer):
         y1 = self.conv1.train(x, scale, ymax, nlayer)
@@ -244,9 +260,7 @@ class res_block2(layer):
             self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=weights, relu=False)
             self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=weights, relu=False)
         else:
-            self.conv1 = conv_block((3, 3, f1, f2), p, noise=None, weights=None)
-            self.conv2 = conv_block((3, 3, f2, f2), 1, noise=None, weights=None, relu=False)
-            self.conv3 = conv_block((1, 1, f1, f2), p, noise=None, weights=None, relu=False)
+            assert (False)
 
     def train(self, x, scale, ymax, nlayer):
         y1 = self.conv1.train(x, scale, ymax, nlayer)
@@ -293,15 +307,16 @@ class dense_block(layer):
         self.max2 = 0.
         
         if weights:
-            w, b, s, scale, z = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['s'], weights[self.layer_id]['scale'], weights[self.layer_id]['z']
+            w, b = weights[self.layer_num]['w'], weights[self.layer_num]['b']
+            w, scale = quantize_and_dequantize(w, -128, 127)
+            b, _ = quantize_and_dequantize(b, -2**28, 2**28-1)
+            w = w / scale
+            b = b / scale
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.s = s
-            self.z = z
             self.scale = tf.Variable(scale, dtype=tf.float32, trainable=False)
         else:
-            self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
-            self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+            assert (False)
         
     def train(self, x, scale, ymax, nlayer):
         if not scale:
@@ -315,16 +330,14 @@ class dense_block(layer):
             x_scale = self.max2 / self.max1
 
         x = tf.reshape(x, (-1, self.isize))
-        # fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
-        # fc = fc * self.scale
         
         if not scale:
-            fc = tf.matmul(x, self.w) + self.b / self.scale * x_scale
+            fc = tf.matmul(x, self.w) + self.b * x_scale
             fc = fc * self.scale
         else:
-            fc = tf.matmul(x, self.w) + tf.round(self.b / self.scale * x_scale)
+            fc = tf.matmul(x, self.w) + tf.round(self.b * x_scale)
             fc = fc / tf.round(1. / self.scale)
-            self.b_scale = tf.round(self.b / self.scale * x_scale)
+            self.b_scale = tf.round(self.b * x_scale)
             self.y_scale = tf.round(1. / self.scale)
         
         # if self.layer_num == nlayer: print (1. / self.scale)

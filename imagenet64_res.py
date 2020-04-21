@@ -37,7 +37,7 @@ def quantize_np(x):
 
 ###############################################################
 
-weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
+weights = np.load('imagenet224.npy', allow_pickle=True).item()
 
 # 2 things:
 # > relu 6
@@ -97,10 +97,6 @@ def get_weights():
 dataset = np.load('val_dataset.npy', allow_pickle=True).item()
 xs, ys = dataset['x'], dataset['y']
 
-xs = xs / 255. 
-xs = xs - np.array([0.485, 0.456, 0.406])
-xs = xs / np.array([0.229, 0.224, 0.225])
-
 total_correct = 0
 for jj in range(0, args.nexamples, args.batch_size):
     s = jj
@@ -120,10 +116,6 @@ print (m.ymax)
 
 dataset = np.load('val_dataset.npy', allow_pickle=True).item()
 xs, ys = dataset['x'], dataset['y']
-
-xs = xs / 255.
-xs = xs - np.array([0.485, 0.456, 0.406])
-xs = xs / np.array([0.229, 0.224, 0.225])
 xs, scale = quantize_np(xs)
 
 for n in range(31):
@@ -136,10 +128,6 @@ for n in range(31):
 
 dataset = np.load('val_dataset.npy', allow_pickle=True).item()
 xs, ys = dataset['x'], dataset['y']
-
-xs = xs / 255. 
-xs = xs - np.array([0.485, 0.456, 0.406])
-xs = xs / np.array([0.229, 0.224, 0.225])
 xs, scale = quantize_np(xs)
 
 total_correct = 0

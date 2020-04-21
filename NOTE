@@ -4,3 +4,10 @@ I believe you can stop quantizing based on 14.
 and quantize all layers to -128, 127
 BUT
 then quantize the two residuals based on profiled data.
+
+ALSO 
+we probably want to fix all the quantize that clip values 
+and dont scale based on absolute value.
+
+THE REASON WHY POSITIVE WEIGHTS ARE FINE
+is becuase of batch norm.
