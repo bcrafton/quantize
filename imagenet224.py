@@ -9,7 +9,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--lr', type=float, default=2e-4)
+parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--name', type=str, default='imagenet224')
@@ -91,6 +91,7 @@ def train_preprocess(image, label):
     image = image / 255.
     # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
+    image = tf.nn.relu(image)
 
     return image, label
     
@@ -115,6 +116,7 @@ def val_preprocess(image, label):
     image = image / 255.
     # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
+    image = tf.nn.relu(image)
 
     return image, label
 
@@ -280,28 +282,25 @@ val_handle = sess.run(val_iterator.string_handle())
 
 ###############################################################
 
-for ii in range(0, args.epochs):
-    print('epoch %d/%d' % (ii, args.epochs))
+sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
-    sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
-
-    total_correct = 0
-    start = time.time()
-    for jj in range(0, len(train_imgs), args.batch_size):
-        [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
-        total_correct += np_sum_correct
-        if (jj % (100 * args.batch_size) == 0):
-            acc = total_correct / (jj + args.batch_size)
-            img_per_sec = (jj + args.batch_size) / (time.time() - start)
-            p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
-            print (p)
+total_correct = 0
+start = time.time()
+for jj in range(0, 100000, args.batch_size):
+    [np_sum_correct, _] = sess.run([train_sum_correct, train], feed_dict={handle: train_handle, learning_rate: args.lr})
+    total_correct += np_sum_correct
+    if (jj % (100 * args.batch_size) == 0):
+        acc = total_correct / (jj + args.batch_size)
+        img_per_sec = (jj + args.batch_size) / (time.time() - start)
+        p = "%d | acc: %f | img/s: %f" % (jj, acc, img_per_sec)
+        print (p)
 
 ##################################################################
 
 sess.run(train_iterator.initializer, feed_dict={filename: train_imgs, label: train_labs})
 
 # MAKE SURE THIS IS SET CORRECTLY!!!
-collect_examples = 5000 * args.batch_size
+collect_examples = 500 * args.batch_size
 
 scales = []
 total_correct = 0

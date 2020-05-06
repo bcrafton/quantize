@@ -14,9 +14,9 @@ from bc_utils.init_tensor import init_matrix
 def quantize_and_dequantize(x, low, high):
     g = tf.get_default_graph()
     with g.gradient_override_map({"Floor": "Identity"}):
-        scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+        scale = tf.reduce_max(tf.abs(x)) / 127
         x = x / scale
-        x = tf.floor(x)
+        x = tf.round(x)
         x = tf.clip_by_value(x, low, high)
         x = x * scale
         return x
@@ -24,9 +24,9 @@ def quantize_and_dequantize(x, low, high):
 def quantize(x, low, high):
     g = tf.get_default_graph()
     with g.gradient_override_map({"Floor": "Identity"}):
-        scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
+        scale = tf.reduce_max(tf.abs(x)) / 127
         x = x / scale
-        x = tf.floor(x)
+        x = tf.round(x)
         x = tf.clip_by_value(x, low, high)
         return x, scale
         
@@ -37,13 +37,13 @@ def dequantize(x, low, high):
         scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
         x = x * scale
         return x
-'''
 
 def dequantize(x, low, high):
     scale = (tf.reduce_max(x) - tf.reduce_min(x)) / (high - low)
     x = x * scale
     return x
-    
+'''    
+
 def quantize_predict(x, scale, low, high):
     x = x / scale
     x = tf.floor(x)
