@@ -21,16 +21,16 @@ def quantize(x, low, high):
 '''
 
 def quantize(x):
-    scale = (np.max(x) - np.min(x)) / (high - low)
+    scale = np.max(np.absolute(x)) / 127
     x = x / scale
-    x = np.floor(x)
+    x = np.round(x)
     x = np.clip(x, low, high)
     return x, scale
 
 def quantize_and_dequantize(x, low, high):
-    scale = (np.max(x) - np.min(x)) / (high - low)
+    scale = np.max(np.absolute(x)) / 127
     x = x / scale
-    x = np.floor(x)
+    x = np.round(x)
     x = np.clip(x, low, high)
     x = x * scale
     return x, scale

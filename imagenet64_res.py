@@ -97,6 +97,8 @@ def get_weights():
 dataset = np.load('val_dataset.npy', allow_pickle=True).item()
 xs, ys = dataset['x'], dataset['y']
 
+print (np.min(xs))
+
 total_correct = 0
 for jj in range(0, args.nexamples, args.batch_size):
     s = jj
@@ -105,12 +107,12 @@ for jj in range(0, args.nexamples, args.batch_size):
     total_correct += correct
 
 acc = total_correct / args.nexamples
-print (acc)
+print ('acc', acc)
 
 ##################################################################
 
 m.set_ymax()
-print (m.ymax)
+# print (m.ymax)
 
 ##################################################################
 
