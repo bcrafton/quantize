@@ -89,8 +89,13 @@ def train_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
     
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
+
+    scale = 127 / tf.reduce_max(tf.abs(image))
+    image = image * scale
+    image = tf.round(image)
+    image = tf.clip_by_value(image, 0, 127)
 
     return image, label
     
@@ -113,8 +118,14 @@ def val_preprocess(image, label):
     image = tf.image.central_crop(image, 0.875)
 
     image = image / 255.
-    image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
+    # image = image - tf.reshape(tf.constant([0.485, 0.456, 0.406]), [1, 1, 3])
     image = image / tf.reshape(tf.constant([0.229, 0.224, 0.225]), [1, 1, 3])
+
+    scale = 127 / tf.reduce_max(tf.abs(image))
+    image = image * scale
+    image = tf.round(image)
+    image = tf.clip_by_value(image, 0, 127)
+    # image = tf.Print(image, [tf.reduce_max(image), tf.reduce_min(image)], message='', summarize=1000)
 
     return image, label
 
@@ -219,7 +230,7 @@ val_iterator = val_dataset.make_initializable_iterator()
 
 ###############################################################
 
-weights = np.load('imagenet224.npy', allow_pickle=True).item()
+weights = np.load('resnet18_quant_weights.npy', allow_pickle=True).item()
 
 m = model(layers=[
 conv_block((7,7,3,64), 2, noise=None, weights=weights),

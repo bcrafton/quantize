@@ -111,80 +111,32 @@ class conv_block(layer):
         self.relu = relu
         
         if weights:
-            f, b = weights[self.layer_id]['f'], weights[self.layer_id]['b']
+            f, b, y = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['y']
             assert (np.shape(f) == shape)
             self.f = tf.Variable(f, dtype=tf.float32)
             self.b = tf.Variable(b, dtype=tf.float32)
-
-            if 'q' in weights[self.layer_id].keys():
-                self.q = weights[self.layer_id]['q']
-            else:
-                g, mean, var = weights[self.layer_id]['g'], weights[self.layer_id]['mean'], weights[self.layer_id]['var']
-                self.g = tf.Variable(g, dtype=tf.float32)
-                self.mean = tf.Variable(mean, dtype=tf.float32, trainable=False)
-                self.var = tf.Variable(var, dtype=tf.float32, trainable=False)
+            self.y = tf.Variable(y, dtype=tf.float32)
 
         else:
             assert (False)
 
     def train(self, x):
-        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') # there is no bias when we have bn.
-        mean = tf.reduce_mean(conv, axis=[0,1,2])
-        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        std = tf.sqrt(var + 1e-5)
-        fold_f = (self.g * self.f) / std
-        fold_b = self.b - ((self.g * mean) / std)
-        qf = quantize_and_dequantize(fold_f, -128, 127)
-        qb = quantize_and_dequantize(fold_b, -2**24, 2**24-1)
-
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
-
-        if self.relu:
-            out = tf.nn.relu(conv)
-        else:
-            out = conv
-
-        qout = quantize_and_dequantize(out, -128, 127)
-        return qout
+        assert (False)
     
     def collect(self, x):
-        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') # there is no bias when we have bn.
-        mean = tf.reduce_mean(conv, axis=[0,1,2])
-        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        std = tf.sqrt(var + 1e-5)
-        fold_f = (self.g * self.f) / std
-        fold_b = self.b - ((self.g * mean) / std)
-        qf, sf = quantize(fold_f, -128, 127)
-        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
-        
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
-
-        if self.relu:
-            out = tf.nn.relu(conv)
-        else:
-            out = conv
-
-        qout, sout = quantize(out, -128, 127)
-        return qout, {self.layer_id: {'scale': sout, 'std': std, 'mean': mean}}
+        assert (False)
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-
-        qf, sf = quantize(self.f, -128, 127)
-        qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
-        
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
 
         if self.relu:
             out = tf.nn.relu(conv)
         else:
             out = conv
         
-        qout = quantize_predict(out, self.q, -128, 127)
+        qout = out / self.y
+        qout = tf.round(qout)
         return qout
         
     def get_weights(self):
@@ -326,40 +278,25 @@ class dense_block(layer):
         self.noise = noise
         
         if weights:
-            w, b = weights[self.layer_id]['w'], weights[self.layer_id]['b']
+            w, b, y = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['y']
             self.w = tf.Variable(w, dtype=tf.float32)
             self.b = tf.Variable(b, dtype=tf.float32)
-            if 'q' in weights[self.layer_id].keys():
-                self.q = weights[self.layer_id]['q']
+            self.y = tf.Variable(y, dtype=tf.float32)
         else:
             assert (False)
         
     def train(self, x):
-        qw = quantize_and_dequantize(self.w, -128, 127)
-        qb = quantize_and_dequantize(self.b, -2**24, 2**24-1)
-        
-        x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
-        qfc = quantize_and_dequantize(fc, -128, 127)
-        return qfc
+        assert (False)
     
     def collect(self, x):
-        qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
-
-        x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
-        qfc, sfc = quantize(fc, -128, 127)
-        return qfc, {self.layer_id: {'scale': sfc}}
+        assert (False)
 
     def predict(self, x):
-        qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
-        qfc = quantize_predict(fc, self.q, -128, 127)
-        return qfc
+        fc = tf.matmul(x, self.w) + self.b
+        fc = fc / self.y
+        return fc
         
     def get_weights(self):
         qw, _ = quantize(self.w, -128, 127)
