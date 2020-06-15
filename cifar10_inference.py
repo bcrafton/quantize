@@ -31,7 +31,7 @@ from layers import *
 ####################################
 
 def quantize_np(x, low, high):
-  scale = (np.max(x) - np.min(x)) / (high - low)
+  scale = np.max(np.absolute(x)) / high
   x = x / scale
   x = np.floor(x)
   x = np.clip(x, low, high)
@@ -57,6 +57,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 weights = np.load('cifar10_weights.npy', allow_pickle=True).item()
 
+'''
 m = model(layers=[
 conv_block(3,   64, 1, noise=args.noise, weights=weights[0]),
 conv_block(64,  64, 2, noise=args.noise, weights=weights[1]),
@@ -69,6 +70,33 @@ conv_block(256, 256, 2, noise=args.noise, weights=weights[5]),
 
 avg_pool(4, 4, weights=weights[6]),
 dense_block(256, 10, noise=args.noise, weights=weights[7])
+])
+'''
+
+m = model(layers=[
+conv_block(3,   64, 1, noise=args.noise, weights=weights[0]),
+conv_block(64,  64, 1, noise=args.noise, weights=weights[1]),
+
+conv_block(64,  128, 1, noise=args.noise, weights=weights[2]),
+conv_block(128, 128, 1, noise=args.noise, weights=weights[3]),
+
+max_pool(2, 2, weights=weights[4]),
+
+conv_block(128, 256, 1, noise=args.noise, weights=weights[5]),
+conv_block(256, 256, 1, noise=args.noise, weights=weights[6]),
+
+max_pool(2, 2, weights=weights[7]),
+
+conv_block(256, 512, 1, noise=args.noise, weights=weights[8]),
+conv_block(512, 512, 1, noise=args.noise, weights=weights[9]),
+
+max_pool(2, 2, weights=weights[10]),
+
+conv_block(512, 512, 1, noise=args.noise, weights=weights[11]),
+conv_block(512, 512, 1, noise=args.noise, weights=weights[12]),
+
+avg_pool(4, 4, weights=weights[13]),
+dense_block(512, 10, noise=args.noise, weights=weights[14])
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])

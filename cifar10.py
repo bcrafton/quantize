@@ -6,7 +6,7 @@ import sys
 ##############################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=1)
+parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--lr', type=float, default=5e-4)
 parser.add_argument('--eps', type=float, default=1.)
@@ -31,12 +31,25 @@ from layers import *
 ####################################
 
 def quantize_np(x, low, high):
-  scale = (np.max(x) - np.min(x)) / (high - low)
-  x = x / scale
-  x = np.floor(x)
-  x = np.clip(x, low, high)
-  return x
+    scale = np.max(np.absolute(x)) / high
+    x = x / scale
+    x = np.floor(x)
+    x = np.clip(x, low, high)
+    return x
   
+def quantize(x, low, high):
+    scale = np.max(np.absolute(x)) / high
+    x = x / scale
+    x = np.floor(x)
+    x = np.clip(x, low, high)
+    return x, scale
+    
+def quantize_predict(x, scale, low, high):
+    x = x / scale
+    x = np.floor(x)
+    x = np.clip(x, low, high)
+    return x
+
 ####################################
 
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
@@ -55,6 +68,7 @@ y_test = keras.utils.to_categorical(y_test, 10)
 
 ####################################
 
+'''
 m = model(layers=[
 conv_block(3,   64, 1, noise=args.noise),
 conv_block(64,  64, 2, noise=args.noise),
@@ -67,6 +81,33 @@ conv_block(256, 256, 2, noise=args.noise),
 
 avg_pool(4, 4),
 dense_block(256, 10, noise=args.noise)
+])
+'''
+
+m = model(layers=[
+conv_block(3,   64, 1, noise=args.noise),
+conv_block(64,  64, 1, noise=args.noise),
+
+conv_block(64,  128, 1, noise=args.noise),
+conv_block(128, 128, 1, noise=args.noise),
+
+max_pool(2, 2),
+
+conv_block(128, 256, 1, noise=args.noise),
+conv_block(256, 256, 1, noise=args.noise),
+
+max_pool(2, 2),
+
+conv_block(256, 512, 1, noise=args.noise),
+conv_block(512, 512, 1, noise=args.noise),
+
+max_pool(2, 2),
+
+conv_block(512, 512, 1, noise=args.noise),
+conv_block(512, 512, 1, noise=args.noise),
+
+avg_pool(4, 4),
+dense_block(512, 10, noise=args.noise)
 ])
 
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -169,12 +210,19 @@ for i in range(len(scales)):
 weight_dict = sess.run(weights, feed_dict={})
 
 for key in weight_dict.keys():
-    weight_dict[key]['q'] = np.ceil(scales[key][0])
+    weight_dict[key]['y'] = np.ceil(scales[key][0])
     if len(scales[key]) == 3:
         assert (np.shape(weight_dict[key]['b']) == np.shape(scales[key][1]))
-        weight_dict[key]['f'] = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
-        weight_dict[key]['b'] = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
-        print (key, np.std(weight_dict[key]['f']), np.std(weight_dict[key]['b']))
+
+        f = weight_dict[key]['f'] * (weight_dict[key]['g'] / scales[key][1])
+        b = weight_dict[key]['b'] - (weight_dict[key]['g'] / scales[key][1]) * scales[key][2]
+
+        qf, sf = quantize(f, -128, 127)
+        qb = quantize_predict(b, sf, -2**24, 2**24-1)
+
+        weight_dict[key]['f'] = qf
+        weight_dict[key]['b'] = qb
+
 
 weight_dict['acc'] = acc
 np.save(args.name, weight_dict)
