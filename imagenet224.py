@@ -89,6 +89,7 @@ batch_size = 50
 accum_correct = 0
 accum = 0
 
+start = time.time()
 for batch in range(0, total, batch_size):
     while load.empty(): pass
     
@@ -101,7 +102,7 @@ for batch in range(0, total, batch_size):
     accum += batch_size
 
     if (accum % 5000) == 0:
-        print (accum, accum_correct / accum)
+        print (accum / (time.time() - start), accum, accum_correct / accum)
 
 load.join()
 
@@ -115,11 +116,12 @@ batch_size = 50
 accum_correct = 0
 accum = 0
 
+start = time.time()
 for batch in range(0, total, batch_size):
     while load.empty(): pass
     
     x, y = load.pop()
-    model_predict = m.qpredict(x)
+    model_predict = m.predict(x, q=True)
     pred = np.argmax(model_predict.numpy(), axis=1)
     
     correct = np.sum(y == pred)
@@ -127,7 +129,7 @@ for batch in range(0, total, batch_size):
     accum += batch_size
 
     if (accum % 5000) == 0:
-        print (accum, accum_correct / accum)
+        print (accum / (time.time() - start), accum, accum_correct / accum)
 
 ##################################################################
 
