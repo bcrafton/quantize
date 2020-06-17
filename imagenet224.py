@@ -72,22 +72,29 @@ dense_block(512, 1000, noise=None, weights=weights)
 
 assert (not load.empty())
 
-total_correct = 0
-total = 0
+total = 50000
+batch_size = 50
 
-while not load.empty():
+accum_correct = 0
+accum = 0
+
+for batch in range(0, total, batch_size):
+    while load.empty(): pass
+    
     x, y = load.pop()
     model_predict = m.predict(x)
     pred = np.argmax(model_predict.numpy(), axis=1)
     
     correct = np.sum(y == pred)
-    total_correct += correct
-    total += 50
+    accum_correct += correct
+    accum += 50
 
-    print (total)
+    if (accum % 1000) == 0:
+        print (accum_correct / accum)
 
-    if (total % 1000) == 0:
-        print (total_correct / total)
+##################################################################
+
+# probably should go back and join the threads.
 
 ##################################################################
 
