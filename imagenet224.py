@@ -32,21 +32,29 @@ from layers import *
 
 import matplotlib.pyplot as plt
 
+from load import Loader
+
 ##############################################
 
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
-    
-##############################################
-
-from load import Loader
-load = Loader('/home/brian/Desktop/ILSVRC2012/val')
 
 ##############################################
 
 # weights = np.load('resnet18.npy', allow_pickle=True).item()
 weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
+
+##############################################
+
+std = np.array([0.229, 0.224, 0.225]) * 255.
+weights[0]['f'] = weights[0]['f'] / np.reshape(std, (3,1))
+
+mean = np.array([0.485, 0.456, 0.406]) * 255.
+expand_mean = np.ones(shape=(7,7,3)) * mean
+expand_mean = expand_mean.flatten()
+
+weights[0]['b'] = weights[0]['b'] - (expand_mean @ np.reshape(weights[0]['f'], (7*7*3, 64)))
 
 ##############################################
 
@@ -73,7 +81,7 @@ dense_block(512, 1000, noise=None, weights=weights)
 
 ###############################################################
 
-assert (not load.empty())
+load = Loader('/home/brian/Desktop/ILSVRC2012/val')
 
 total = 50000
 batch_size = 50
@@ -90,14 +98,36 @@ for batch in range(0, total, batch_size):
     
     correct = np.sum(y == pred)
     accum_correct += correct
-    accum += 50
+    accum += batch_size
 
-    if (accum % 1000) == 0:
-        print (accum_correct / accum)
+    if (accum % 5000) == 0:
+        print (accum, accum_correct / accum)
+
+load.join()
 
 ##################################################################
 
-# probably should go back and join the threads.
+load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+
+total = 50000
+batch_size = 50
+
+accum_correct = 0
+accum = 0
+
+for batch in range(0, total, batch_size):
+    while load.empty(): pass
+    
+    x, y = load.pop()
+    model_predict = m.qpredict(x)
+    pred = np.argmax(model_predict.numpy(), axis=1)
+    
+    correct = np.sum(y == pred)
+    accum_correct += correct
+    accum += batch_size
+
+    if (accum % 5000) == 0:
+        print (accum, accum_correct / accum)
 
 ##################################################################
 

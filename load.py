@@ -51,10 +51,10 @@ def preprocess(filename):
     assert(w2 <= new_W)
     image = image[h1:h2, w1:w2, :]
     
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    image = image / 255
-    image = (image - mean) / std
+    # mean = np.array([0.485, 0.456, 0.406])
+    # std = np.array([0.229, 0.224, 0.225])
+    # image = image / 255
+    # image = (image - mean) / std
     
     return image
 
@@ -62,7 +62,7 @@ def preprocess(filename):
 
 def fill_queue(tid, nthread, batch_size, images, labels, q):
     for batch in range(0, len(images), batch_size * nthread):
-        # print (batch + tid*batch_size)
+        print (batch + tid*batch_size)
         while q.full(): pass
         batch_x = []
         batch_y = []
@@ -99,11 +99,14 @@ class Loader:
         
         ##############################
         
-        nthread = 4
-        batch_size = 50
-        for tid in range(nthread):
-            thread = Process(target=fill_queue, args=(tid, nthread, batch_size, self.images, self.labels, self.q))
+        self.threads = []
+        self.nthread = 4
+        self.batch_size = 50
+        
+        for tid in range(self.nthread):
+            thread = Process(target=fill_queue, args=(tid, self.nthread, self.batch_size, self.images, self.labels, self.q))
             thread.start()
+            self.threads.append(thread)
 
         ##############################
 
@@ -116,6 +119,10 @@ class Loader:
 
     def full(self):
         return self.q.full()
+        
+    def join(self):
+        for tid in range(self.nthread):
+            self.threads[tid].join()
 
 ###################################################################
 
