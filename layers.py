@@ -63,14 +63,19 @@ class conv_block(layer):
         self.pad = self.k // 2
         self.relu = relu
         
-        f, b = weights[self.layer_id]['f'], weights[self.layer_id]['b']
+        if 'g' in weights[self.layer_id].keys():
+            f, b, g, mean, var = weights[self.layer_id]['f'], weights[self.layer_id]['b'], weights[self.layer_id]['g'], weights[self.layer_id]['mean'], weights[self.layer_id]['var']
+            var = np.sqrt(var + 1e-5)
+            f = f * (g / var)
+            b = b - (g / var) * mean
+            self.f = tf.Variable(f, dtype=tf.float32)
+            self.b = tf.Variable(b, dtype=tf.float32)
+        else:
+            f, b = weights[self.layer_id]['f'], weights[self.layer_id]['b']
+            self.f = tf.Variable(f, dtype=tf.float32)
+            self.b = tf.Variable(b, dtype=tf.float32)
+            
         assert (np.shape(f) == shape)
-        self.f = tf.Variable(f, dtype=tf.float32)
-        self.b = tf.Variable(b, dtype=tf.float32)
-        g, mean, var = weights[self.layer_id]['g'], weights[self.layer_id]['mean'], weights[self.layer_id]['var']
-        self.g = tf.Variable(g, dtype=tf.float32)
-        self.mean = tf.Variable(mean, dtype=tf.float32, trainable=False)
-        self.var = tf.Variable(var, dtype=tf.float32, trainable=False)
 
     def train(self, x):
         assert (False)
@@ -82,8 +87,8 @@ class conv_block(layer):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
-        mean, var = tf.nn.moments(conv, axes=[0,1,2])
-        bn = tf.nn.batch_normalization(conv, self.mean, self.var, self.b, self.g, 1e-5)
+        # bn = tf.nn.batch_normalization(conv, self.mean, self.var, self.b, self.g, 1e-5)
+        bn = conv + self.b
 
         if self.relu:
             out = tf.nn.relu(bn)

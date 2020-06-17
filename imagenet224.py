@@ -45,7 +45,10 @@ load = Loader('/home/brian/Desktop/ILSVRC2012/val')
 
 ##############################################
 
-weights = np.load('resnet18.npy', allow_pickle=True).item()
+# weights = np.load('resnet18.npy', allow_pickle=True).item()
+weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
+
+##############################################
 
 m = model(layers=[
 conv_block((7,7,3,64), 2, noise=None, weights=weights),
