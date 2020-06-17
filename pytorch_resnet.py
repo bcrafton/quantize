@@ -28,13 +28,9 @@ preprocess = transforms.Compose([
 
 correct = 0
 total = 0
+pred = np.zeros(shape=50000)
 
-labels_path = './ILSVRC2012/validation_labels.txt'
-labels = np.loadtxt(labels_path, dtype=int)
-
-pred = np.zeros_like(labels)
-
-path = './ILSVRC2012/val/'
+path = '/home/brian/Desktop/ILSVRC2012/val'
 for subdir, dirs, files in os.walk(path):
     for file in files:
         label = int(subdir.split('/')[-1])
@@ -62,7 +58,7 @@ print (correct, total, correct / total)
 # Quantized : 0.68132
 # Expected: 69.4
             
-np.save('predictions', pred)
+# np.save('predictions', pred)
                        
 # images are named the same !
 # we have 1:50k
