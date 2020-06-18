@@ -47,10 +47,10 @@ weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
 
 ##############################################
 
-std = np.array([0.229, 0.224, 0.225]) * 255.
+std = np.array([0.229, 0.224, 0.225]) * 255. / 2.
 weights[0]['f'] = weights[0]['f'] / np.reshape(std, (3,1))
 
-mean = np.array([0.485, 0.456, 0.406]) * 255.
+mean = np.array([0.485, 0.456, 0.406]) * 255. / 2.
 expand_mean = np.ones(shape=(7,7,3)) * mean
 expand_mean = expand_mean.flatten()
 
@@ -116,12 +116,98 @@ batch_size = 50
 accum_correct = 0
 accum = 0
 
+target = 1
+
 start = time.time()
 for batch in range(0, total, batch_size):
     while load.empty(): pass
     
     x, y = load.pop()
-    model_predict = m.predict(x, q=True)
+    model_predict = m.predict(x, q=True, l=target)
+    pred = np.argmax(model_predict.numpy(), axis=1)
+    
+    correct = np.sum(y == pred)
+    accum_correct += correct
+    accum += batch_size
+
+    if (accum % 5000) == 0:
+        print (accum / (time.time() - start), target, accum, accum_correct / accum)
+        target += 1
+
+load.join()
+
+##################################################################
+
+load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+
+total = 50000
+batch_size = 50
+
+accum_correct = 0
+accum = 0
+
+start = time.time()
+for batch in range(0, total, batch_size):
+    while load.empty(): pass
+    
+    x, y = load.pop()
+    model_predict = m.predict(x, q=True, l=target)
+    pred = np.argmax(model_predict.numpy(), axis=1)
+    
+    correct = np.sum(y == pred)
+    accum_correct += correct
+    accum += batch_size
+
+    if (accum % 5000) == 0:
+        print (accum / (time.time() - start), target, accum, accum_correct / accum)
+        target += 1
+
+load.join()
+
+##################################################################
+
+load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+
+total = 50000
+batch_size = 50
+
+accum_correct = 0
+accum = 0
+
+start = time.time()
+for batch in range(0, total, batch_size):
+    while load.empty(): pass
+    
+    x, y = load.pop()
+    model_predict = m.predict(x, q=True, l=target)
+    pred = np.argmax(model_predict.numpy(), axis=1)
+    
+    correct = np.sum(y == pred)
+    accum_correct += correct
+    accum += batch_size
+
+    if (accum % 5000) == 0:
+        print (accum / (time.time() - start), target, accum, accum_correct / accum)
+        target += 1
+
+load.join()
+
+##################################################################
+
+load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+
+total = 50000
+batch_size = 50
+
+accum_correct = 0
+accum = 0
+
+start = time.time()
+for batch in range(0, total, batch_size):
+    while load.empty(): pass
+    
+    x, y = load.pop()
+    model_predict = m.predict(x, q=True, l=100)
     pred = np.argmax(model_predict.numpy(), axis=1)
     
     correct = np.sum(y == pred)
@@ -131,10 +217,9 @@ for batch in range(0, total, batch_size):
     if (accum % 5000) == 0:
         print (accum / (time.time() - start), accum, accum_correct / accum)
 
+load.join()
+
 ##################################################################
-
-
-
 
 
 

@@ -56,13 +56,15 @@ def preprocess(filename):
     # image = image / 255
     # image = (image - mean) / std
     
+    image = image / 2
+    
     return image
 
 #########################################
 
 def fill_queue(tid, nthread, batch_size, images, labels, q):
     for batch in range(0, len(images), batch_size * nthread):
-        print (batch + tid*batch_size)
+        # print (batch + tid*batch_size)
         while q.full(): pass
         batch_x = []
         batch_y = []
