@@ -94,11 +94,17 @@ class conv_block(layer):
         
         if 'g' in weights[self.weight_id].keys():
             f, b, g, mean, var = weights[self.weight_id]['f'], weights[self.weight_id]['b'], weights[self.weight_id]['g'], weights[self.weight_id]['mean'], weights[self.weight_id]['var']
+            
             var = np.sqrt(var + 1e-5)
             f = f * (g / var)
             b = b - (g / var) * mean
+            
+            qf, scale = quantize_np(f, -128, 127)
+            qb = b / scale
+            
             self.f = tf.Variable(f, dtype=tf.float32)
             self.b = tf.Variable(b, dtype=tf.float32)
+            self.scale = tf.Variable(scale, dtype=tf.float32)
         else:
             f, b = weights[self.weight_id]['f'], weights[self.weight_id]['b']
 
@@ -131,14 +137,36 @@ class conv_block(layer):
         else:
             out = conv
 
-        out = out * self.scale
-        
+        '''
+        if not scale:
+            out = out * self.scale
+            self.ymax1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax1)
+            self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
+            y_scale = 1
+        elif self.layer_num > nlayer:
+            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
+            self.y_scale = tf.round(1. / (y_scale * self.scale))
+            out = out / tf.round(1. / (y_scale * self.scale))
+            out = tf.clip_by_value(tf.round(out), -128, 127)
+        else:
+            out = out * self.scale
+            self.ymax2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.ymax2)
+            y_scale = (127. / self.ymax2) * tf.minimum(1., (self.ymax() / ymax))
+            out = out * y_scale
+        '''
+
         if q and (l > self.layer_id):
-            self.y2 = tf.maximum(tf.reduce_max(tf.abs(out)), self.y2)
-            y_scale = (127 / self.y2)
+            self.y2 = tf.maximum(tf.reduce_max(tf.abs(out * self.scale)), self.y2)
+            y_scale = self.scale * 127 / self.y2
+            y_scale = 1 / y_scale
+            y_scale = tf.round(y_scale)
+            y_scale = 1 / y_scale
+            # print (self.layer_id, y_scale)
         elif q:
+            out = out * self.scale
             y_scale = 1
         else:
+            out = out * self.scale
             self.y1 = tf.maximum(tf.reduce_max(tf.abs(out)), self.y1)
             y_scale = 1
             
