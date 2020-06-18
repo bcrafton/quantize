@@ -42,11 +42,15 @@ for device in gpu_devices:
 
 ##############################################
 
+# this might fail because we dont fuse the conv + bn first
 # weights = np.load('resnet18.npy', allow_pickle=True).item()
+
+# this might work because we fuse the conv + bn first
 weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
 
 ##############################################
 
+# I think this works because we have (mean=0, std=1)
 std = np.array([0.229, 0.224, 0.225]) * 255. / 2.
 weights[0]['f'] = weights[0]['f'] / np.reshape(std, (3,1))
 

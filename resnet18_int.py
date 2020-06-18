@@ -28,13 +28,50 @@ wfloat = np.reshape(wfloat, (7*7*3, 64))
 ###################################
 
 x = np.random.uniform(-1, 1, size=(7*7*3))
-yint = x @ wint
-yfloat = (x @ wfloat) / scale + z
+yfloat = x @ wfloat + b
+yint = (x @ wint - z) * scale + b
 
-print (yint)
-print (yfloat)
+print (yfloat[0:3])
+print (yint[0:3])
 
 ###################################
+
+x = x * 10 + 2
+
+###################################
+
+wfloat = wfloat / 10
+bfloat = b - (2 * np.ones_like(x)) @ wfloat
+
+yfloat = x @ wfloat + bfloat
+
+print (yfloat[0:3])
+
+###################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
