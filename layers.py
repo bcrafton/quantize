@@ -98,12 +98,26 @@ class conv_block(layer):
             var = np.sqrt(var + 1e-5)
             f = f * (g / var)
             b = b - (g / var) * mean
+
+            #############################
             
+            if self.weight_id == 0:
+                std = np.array([0.229, 0.224, 0.225]) * 255. / 2.
+                f = f / np.reshape(std, (3,1))
+
+                mean = np.array([0.485, 0.456, 0.406]) * 255. / 2.
+                expand_mean = np.ones(shape=(7,7,3)) * mean
+                expand_mean = expand_mean.flatten()
+
+                b = b - (expand_mean @ np.reshape(f, (7*7*3, 64)))
+            
+            #############################
+
             qf, scale = quantize_np(f, -128, 127)
             qb = b / scale
             
-            self.f = tf.Variable(f, dtype=tf.float32)
-            self.b = tf.Variable(b, dtype=tf.float32)
+            self.f = tf.Variable(qf, dtype=tf.float32)
+            self.b = tf.Variable(qb, dtype=tf.float32)
             self.scale = tf.Variable(scale, dtype=tf.float32)
         else:
             f, b = weights[self.weight_id]['f'], weights[self.weight_id]['b']
@@ -158,9 +172,9 @@ class conv_block(layer):
         if q and (l > self.layer_id):
             self.y2 = tf.maximum(tf.reduce_max(tf.abs(out * self.scale)), self.y2)
             y_scale = self.scale * 127 / self.y2
-            y_scale = 1 / y_scale
-            y_scale = tf.round(y_scale)
-            y_scale = 1 / y_scale
+            # y_scale = 1 / y_scale
+            # y_scale = tf.round(y_scale)
+            # y_scale = 1 / y_scale
             # print (self.layer_id, y_scale)
         elif q:
             out = out * self.scale

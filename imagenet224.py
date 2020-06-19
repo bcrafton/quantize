@@ -42,13 +42,21 @@ for device in gpu_devices:
 
 ##############################################
 
-# this might fail because we dont fuse the conv + bn first
-# weights = np.load('resnet18.npy', allow_pickle=True).item()
-
-# this might work because we fuse the conv + bn first
-weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
+'''
+> x2 = 127 method only works with unscaled input images
+> for unscaled images, we need to scale layer=0 for 'resnet18.npy' inside of conv layer.
+  > if layer_id == 0
+  > f = f ...
+'''
 
 ##############################################
+
+# weights = np.load('resnet18.npy', allow_pickle=True).item()
+
+##############################################
+
+# '''
+weights = np.load('resnet18_quant.npy', allow_pickle=True).item()
 
 # I think this works because we have (mean=0, std=1)
 std = np.array([0.229, 0.224, 0.225]) * 255. / 2.
@@ -59,6 +67,7 @@ expand_mean = np.ones(shape=(7,7,3)) * mean
 expand_mean = expand_mean.flatten()
 
 weights[0]['b'] = weights[0]['b'] - (expand_mean @ np.reshape(weights[0]['f'], (7*7*3, 64)))
+# '''
 
 ##############################################
 
