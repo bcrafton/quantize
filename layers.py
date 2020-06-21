@@ -86,6 +86,12 @@ class model:
             weights_dict.update(layer.get_weights())
         return weights_dict
         
+    def get_params(self):
+        params = []
+        for layer in self.layers:
+            params.extend(layer.get_params())
+        return params
+        
 #############
 
 class layer:
@@ -109,14 +115,14 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p, noise, weights=None):
+    def __init__(self, f1, f2, p, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        self.noise = noise
+
         
         if weights:
             print (weights.keys())
@@ -191,18 +197,20 @@ class conv_block(layer):
         weights_dict = {}
         weights_dict[self.layer_id] = {'f': self.f, 'g': self.g, 'b': self.b}
         return weights_dict
-        
+
+    def get_params(self):
+        return [self.f, self.b, self.g]
+
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize, noise, weights=None):
+    def __init__(self, isize, osize, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
     
         self.isize = isize
         self.osize = osize
-        self.noise = noise
-        
+
         if weights:
             w, b, q = weights['w'], weights['b'], weights['y']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
@@ -215,28 +223,27 @@ class dense_block(layer):
         
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
-        qb = quantize_and_dequantize(self.b, -128, 127)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) + self.b
         qfc = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
     def collect(self, x):
-        qw, _ = quantize(self.w, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        qw, sw = quantize(self.w, -128, 127)
+        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) + qb
         qfc, sfc = quantize(fc, -128, 127)
         return qfc, [sfc]
 
     def predict(self, x, scale):
-        qw, _ = quantize(self.w, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
+        qf = self.f
+        qb = self.b
         
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) # + qb
+        fc = tf.matmul(x, qw) + qb
         qfc = quantize_predict(fc, scale, -128, 127)
         return qfc
         
@@ -251,6 +258,9 @@ class dense_block(layer):
         weights_dict[self.layer_id] = {'w': qw, 'b': qb}
         
         return weights_dict
+        
+    def get_params(self):
+        return [self.w]
 
 #############
 
@@ -290,6 +300,9 @@ class avg_pool(layer):
         weights_dict = {}
         weights_dict[self.layer_id] = {}
         return weights_dict
+        
+    def get_params(self):
+        return []
 
 #############
 
@@ -330,7 +343,8 @@ class max_pool(layer):
         weights_dict[self.layer_id] = {}
         return weights_dict
 
-
+    def get_params(self):
+        return []
 
 
 
