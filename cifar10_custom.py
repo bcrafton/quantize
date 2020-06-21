@@ -3,8 +3,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import datasets, layers, models
 
-from layers import *
-
 ####################################
 
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -40,10 +38,7 @@ class Conv(tf.keras.layers.Layer):
 
     def call(self, input):
         # return tf.matmul(input, self.kernel)
-        y = tf.nn.conv2d(input, self.kernel, 1, 'SAME') + self.bias
-        a = tf.nn.relu(y)
-        q = quantize_and_dequantize(a, -128, 127)
-        return q
+        return tf.nn.relu(tf.nn.conv2d(input, self.kernel, 1, 'SAME') + self.bias)
 
 ####################################
 
@@ -63,6 +58,7 @@ model.add(layers.Dense(10))
 ####################################
 
 model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
+
 history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
 
 ####################################

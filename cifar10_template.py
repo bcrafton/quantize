@@ -3,8 +3,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import datasets, layers, models
 
-from layers import *
-
 ####################################
 
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -27,35 +25,16 @@ x_test = x_test / np.std(x_test, axis=0, keepdims=True)
 
 ####################################
 
-class Conv(tf.keras.layers.Layer):
-    def __init__(self, k, f):
-        super(Conv, self).__init__()
-        self.k = k
-        self.f = f
 
-    def build(self, input_shape):
-        _, _, _, c = input_shape
-        self.kernel = self.add_weight("kernel", shape=[self.k, self.k, c, self.f])
-        self.bias = self.add_weight("kernel", shape=[self.f])
-
-    def call(self, input):
-        # return tf.matmul(input, self.kernel)
-        y = tf.nn.conv2d(input, self.kernel, 1, 'SAME') + self.bias
-        a = tf.nn.relu(y)
-        q = quantize_and_dequantize(a, -128, 127)
-        return q
 
 ####################################
 
 model = models.Sequential()
-# model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
-model.add(Conv(3, 32))
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
 model.add(layers.MaxPooling2D((2, 2)))
-# model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(Conv(3, 64))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
 model.add(layers.MaxPooling2D((2, 2)))
-# model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(Conv(3, 64))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
 model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
 model.add(layers.Dense(10))
@@ -63,6 +42,7 @@ model.add(layers.Dense(10))
 ####################################
 
 model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
+
 history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
 
 ####################################

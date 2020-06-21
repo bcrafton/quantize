@@ -9,26 +9,38 @@ from bc_utils.init_tensor import init_matrix
 
 #############
 
-# TODO: quantize followed by dequantize does not work.
+# https://stackoverflow.com/questions/59656219/override-tf-floor-gradient
+
+# this would also work:
+# https://www.tensorflow.org/api_docs/python/tf/grad_pass_through
+
+@tf.custom_gradient
+def floor_no_grad(x):
+
+    def grad(dy):
+        return dy
+    
+    return tf.floor(x), grad
+    
 
 def quantize_and_dequantize(x, low, high):
-    g = tf.get_default_graph()
-    with g.gradient_override_map({"Floor": "Identity"}):
-        scale = tf.reduce_max(tf.abs(x)) / high
-        x = x / scale
-        x = tf.floor(x)
-        x = tf.clip_by_value(x, low, high)
-        x = x * scale
-        return x
+    # g = tf.get_default_graph()
+    # with g.gradient_override_map({"Floor": "Identity"}):
+    scale = tf.reduce_max(tf.abs(x)) / high
+    x = x / scale
+    x = floor_no_grad(x)
+    x = tf.clip_by_value(x, low, high)
+    x = x * scale
+    return x
 
 def quantize(x, low, high):
-    g = tf.get_default_graph()
-    with g.gradient_override_map({"Floor": "Identity"}):
-        scale = tf.reduce_max(tf.abs(x)) / high
-        x = x / scale
-        x = tf.floor(x)
-        x = tf.clip_by_value(x, low, high)
-        return x, scale
+    # g = tf.get_default_graph()
+    # with g.gradient_override_map({"Floor": "Identity"}):
+    scale = tf.reduce_max(tf.abs(x)) / high
+    x = x / scale
+    x = floor_no_grad(x)
+    x = tf.clip_by_value(x, low, high)
+    return x, scale
     
 def quantize_predict(x, scale, low, high):
     x = x / scale
