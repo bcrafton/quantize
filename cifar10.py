@@ -58,15 +58,45 @@ model.add(layers.MaxPooling2D((2, 2)))
 model.add(Conv(3, 64))
 model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
+# model.add(layers.Dense(10, activation='softmax'))
 model.add(layers.Dense(10))
 
 ####################################
 
-model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
-history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
+# model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
+# history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
 
 ####################################
 
+optimizer = tf.keras.optimizers.Adam()
+cce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+
+def gradients(model, x, y):
+    with tf.GradientTape() as tape:
+        pred_logits = model(x)
+        pred_label = tf.argmax(pred_logits, axis=1)
+        
+        # loss = cce(y_true=y, y_pred=pred_logits)
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits)
+        correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
+    
+    grad = tape.gradient(loss, model.trainable_variables)
+    return loss, correct, grad
+
+for epoch in range(5):
+    total_correct = 0
+    for batch in range(0, len(x_train), 50):
+        xs = x_train[batch:batch+50]
+        ys = y_train[batch:batch+50].reshape(-1).astype(np.int32)
+        
+        loss, correct, grad = gradients(model, xs, ys)
+        optimizer.apply_gradients(zip(grad, model.trainable_variables))
+
+        total_correct += correct
+        
+    print (total_correct)
+
+####################################
 
 
 
