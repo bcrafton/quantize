@@ -28,15 +28,17 @@ x_test = x_test / np.std(x_test, axis=0, keepdims=True)
 ####################################
 
 class Conv(tf.keras.layers.Layer):
-    def __init__(self, k, f):
+    def __init__(self, k, f, w, b):
         super(Conv, self).__init__()
         self.k = k
         self.f = f
+        self.kernel = tf.Variable(w, trainable=True)
+        self.bias = tf.Variable(b, trainable=True)
 
     def build(self, input_shape):
         _, _, _, c = input_shape
-        self.kernel = self.add_weight("kernel", shape=[self.k, self.k, c, self.f])
-        self.bias = self.add_weight("kernel", shape=[self.f])
+        # self.kernel = self.add_weight("kernel", shape=[self.k, self.k, c, self.f])
+        # self.bias = self.add_weight("kernel", shape=[self.f])
 
     def call(self, input):
         # return tf.matmul(input, self.kernel)
@@ -47,54 +49,52 @@ class Conv(tf.keras.layers.Layer):
 
 ####################################
 
+w1 = np.random.normal(loc=0., scale=0.05, size=(3,3,3,32)).astype(np.float32)
+b1 = np.zeros(shape=32).astype(np.float32)
+w2 = np.random.normal(loc=0., scale=0.05, size=(3,3,32,64)).astype(np.float32)
+b2 = np.zeros(shape=64).astype(np.float32)
+w3 = np.random.normal(loc=0., scale=0.05, size=(3,3,64,64)).astype(np.float32)
+b3 = np.zeros(shape=64).astype(np.float32)
+
+####################################
+
 model = models.Sequential()
-# model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
-model.add(Conv(3, 32))
+model.add(Conv(3, 32, w1, b1))
 model.add(layers.MaxPooling2D((2, 2)))
-# model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(Conv(3, 64))
+model.add(Conv(3, 64, w2, b2))
 model.add(layers.MaxPooling2D((2, 2)))
-# model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(Conv(3, 64))
+model.add(Conv(3, 64, w3, b3))
 model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
-# model.add(layers.Dense(10, activation='softmax'))
 model.add(layers.Dense(10))
 
 ####################################
 
-# model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
-# history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
-
-####################################
-
 optimizer = tf.keras.optimizers.Adam()
-cce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
         pred_logits = model(x)
         pred_label = tf.argmax(pred_logits, axis=1)
-        
-        # loss = cce(y_true=y, y_pred=pred_logits)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits)
         correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     
     grad = tape.gradient(loss, model.trainable_variables)
     return loss, correct, grad
 
+batch_size = 50
 for epoch in range(5):
     total_correct = 0
-    for batch in range(0, len(x_train), 50):
-        xs = x_train[batch:batch+50]
-        ys = y_train[batch:batch+50].reshape(-1).astype(np.int32)
+    for batch in range(0, len(x_train), batch_size):
+        xs = x_train[batch:batch+batch_size]
+        ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int32)
         
         loss, correct, grad = gradients(model, xs, ys)
         optimizer.apply_gradients(zip(grad, model.trainable_variables))
 
         total_correct += correct
         
-    print (total_correct)
+    print (total_correct / len(x_train) * 100)
 
 ####################################
 
