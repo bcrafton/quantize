@@ -153,7 +153,14 @@ class conv_block(layer):
 
         if 'g' in weights[self.weight_id].keys():
             f, b, g, mean, var = weights[self.weight_id]['f'], weights[self.weight_id]['b'], weights[self.weight_id]['g'], weights[self.weight_id]['mean'], weights[self.weight_id]['var']
-            
+
+            # need to actually do mean/var in forward if using new weights.
+            # f = np.random.normal(loc=0., scale=np.std(f), size=np.shape(f))
+            # b = np.zeros_like(b)
+            # g = np.ones_like(g)
+
+            #############################
+
             '''
             var = np.sqrt(var + 1e-5)
             f = f * (g / var)
@@ -188,16 +195,16 @@ class conv_block(layer):
 
     def train(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        '''
+        
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         # mean = tf.reduce_mean(conv, axis=[0,1,2])
         # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         # shouldnt this be the same thing ? 
         mean, var = tf.nn.moments(conv, axes=[0,1,2])
         std = tf.sqrt(var + 1e-5)
-        '''
-        mean = self.mean
-        std = self.std
+        
+        # mean = self.mean
+        # std = self.std
         
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)

@@ -12,7 +12,7 @@ for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 '''
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[1]
+gpu = gpus[0]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 ####################################
@@ -55,13 +55,16 @@ params = model.get_params()
 
 ####################################
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1.)
+# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-1, beta_1=0.9, beta_2=0.999, epsilon=1.)
+# optimizer = tf.keras.optimizers.SGD(learning_rate=1e-3, momentum=0.9)
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
         pred_logits = model.train(x)
         pred_label = tf.argmax(pred_logits, axis=1)
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits)
+        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits))
         correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     
     grad = tape.gradient(loss, params)
@@ -77,10 +80,12 @@ def predict(model, x, y):
 
 ####################################
 
-total = 1000000
+total = 1285000
 total_correct = 0
 total_loss = 0
-batch_size = 100
+batch_size = 64
+
+train_flag = True
 
 for epoch in range(2):
     # load = Loader('/home/brian/Desktop/ILSVRC2012/val')
@@ -94,19 +99,21 @@ for epoch in range(2):
         
         x, y = load.pop()
         
-        loss, correct, grad = gradients(model, x, y)
-        optimizer.apply_gradients(zip(grad, params))
-        
-        # correct = predict(model, x, y)
+        if train_flag:
+            loss, correct, grad = gradients(model, x, y)
+            optimizer.apply_gradients(zip(grad, params))
+            total_loss += loss.numpy()
+        else:
+            correct = predict(model, x, y)
+
         total_correct += correct.numpy()
-        total_loss += np.sum(loss.numpy())
         
         acc = round(total_correct / (batch + batch_size), 3)
         avg_loss = total_loss / (batch + batch_size)
         
         if (batch + batch_size) % (batch_size * 100) == 0:
             img_per_sec = (batch + batch_size) / (time.time() - start)
-            print (epoch, batch, img_per_sec, acc, avg_loss)
+            print (epoch, batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
 
