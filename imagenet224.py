@@ -22,16 +22,6 @@ def quantize_np(x, low, high):
 
 ####################################
 
-'''
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
-
-assert(np.shape(x_train) == (50000, 32, 32, 3))
-x_train = quantize_np(x_train, 0, 127)
-
-assert(np.shape(x_test) == (10000, 32, 32, 3))
-x_test = quantize_np(x_test, 0, 127)
-'''
-
 load = Loader('/home/brian/Desktop/ILSVRC2012/val')
 
 ####################################
@@ -108,24 +98,6 @@ for batch in range(0, total, batch_size):
 
 load.join()
 
-####################################
-'''
-batch_size = 50
-for epoch in range(5):
-    total_correct = 0
-    for batch in range(0, len(x_train), batch_size):
-        print (batch)
-    
-        xs = x_train[batch:batch+batch_size]
-        ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int32)
-        
-        loss, correct, grad = gradients(model, xs, ys)
-        optimizer.apply_gradients(zip(grad, params))
-
-        total_correct += correct
-        
-    print (total_correct / len(x_train) * 100)
-'''
 ####################################
 
 
