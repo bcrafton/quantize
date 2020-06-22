@@ -87,10 +87,12 @@ for epoch in range(2):
         
         x, y = load.pop()
         
+        # if inference:
+        # correct = predict(model, x, y)
+        # if train:
         loss, correct, grad = gradients(model, x, y)
         optimizer.apply_gradients(zip(grad, params))
         
-        # correct = predict(model, x, y)
         total_correct += correct.numpy()
         total_loss += np.sum(loss.numpy())
         
