@@ -3,8 +3,10 @@ import os
 import numpy as np
 import cv2
 from PIL import Image
-import random
+
 from multiprocessing import Process, Queue
+
+import random
 
 #########################################
 '''
@@ -57,7 +59,8 @@ def preprocess(filename):
     image = (image - mean) / std
     
     # image = image / 2
-    
+    # print (np.std(image), np.mean(image))
+
     return image
 
 #########################################
@@ -83,37 +86,47 @@ def fill_queue(tid, nthread, batch_size, images, labels, q):
 
 class Loader:
 
-    def __init__(self, path, batch_size, nthread):
+    def __init__(self, path):
       
         ##############################
     
         self.path = path
-        self.q = Queue(maxsize=32)
-        self.batch_size = batch_size
-        self.nthread = nthread
-
+        self.q = Queue(maxsize=8)
+        
         ##############################
         
+        f = open('train_labels.txt', 'r')
+        lines = f.readlines()
+
+        labels = {}
+        for label, line in enumerate(lines):
+            line = line.split(' ')[0]
+            labels[line] = label
+
+        ##############################
+
         self.images = []
         self.labels = []
         for subdir, dirs, files in os.walk(path):
             for file in files:
-                if file in ['keras_imagenet_val.py', 'keras_imagenet_train.py']:
-                    continue
-                
                 self.images.append(os.path.join(subdir, file))
-                label = int(subdir.split('/')[-1])
-                self.labels.append(label)
-        
-        ##############################
-
-        merge = list(zip(self.images, self.labels))
-        random.shuffle(merge)
-        self.images, self.labels = zip(*merge)
-
+                label = subdir.split('/')[-1]
+                # if labels[label] < 10:
+                #     print (label, labels[label])
+                self.labels.append(labels[label])
+                
         ##############################
         
+        # merge = list(zip(self.images, self.labels))
+        # random.shuffle(merge)
+        # self.images, self.labels = zip(*merge)
+        # print (self.labels[0:100])
+
+        ##############################
+
         self.threads = []
+        self.nthread = 4
+        self.batch_size = 32
         
         for tid in range(self.nthread):
             thread = Process(target=fill_queue, args=(tid, self.nthread, self.batch_size, self.images, self.labels, self.q))

@@ -6,11 +6,15 @@ from load import Loader
 import time
 
 ####################################
-
+'''
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
-
+'''
+gpus = tf.config.experimental.list_physical_devices('GPU')
+gpu = gpus[1]
+tf.config.experimental.set_visible_devices(gpu, 'GPU')
+tf.config.experimental.set_memory_growth(gpu, True)
 ####################################
 
 def quantize_np(x, low, high):
@@ -51,7 +55,7 @@ params = model.get_params()
 
 ####################################
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
@@ -73,17 +77,20 @@ def predict(model, x, y):
 
 ####################################
 
-total = 50000
+total = 1000000
 total_correct = 0
 total_loss = 0
-batch_size = 32
+batch_size = 100
 
 for epoch in range(2):
-    load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+    # load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+    # load = Loader('/home/bcrafton3/Data_SSD/datasets/imagenet224/train/')
+    # load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_val/')
+    load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', batch_size, 8)
     start = time.time()
     
     for batch in range(0, total, batch_size):
-        while load.empty(): pass
+        while load.empty(): pass # print ('empty')
         
         x, y = load.pop()
         
@@ -96,8 +103,10 @@ for epoch in range(2):
         
         acc = round(total_correct / (batch + batch_size), 3)
         avg_loss = total_loss / (batch + batch_size)
-
-        print (epoch, batch, acc, avg_loss)
+        
+        if (batch + batch_size) % (batch_size * 100) == 0:
+            img_per_sec = (batch + batch_size) / (time.time() - start)
+            print (epoch, batch, img_per_sec, acc, avg_loss)
 
     load.join()
 
