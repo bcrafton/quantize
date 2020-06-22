@@ -78,12 +78,13 @@ class model:
     def __init__(self, layers):
         self.layers = layers
         
-    def train(self, x):
+    def train(self, x, training=False):
         y = x
         for layer in self.layers:
-            y = layer.train(y)
+            y = layer.train(y, training)
         return y
     
+    '''
     def collect(self, x):
         scale = []
         y = x 
@@ -103,7 +104,8 @@ class model:
         for layer in self.layers:
             y = layer.inference(y)
         return y
-        
+    '''
+    
     def get_weights(self):
         weights_dict = {}
         for layer in self.layers:
@@ -193,18 +195,19 @@ class conv_block(layer):
         else:
             assert (False)
 
-    def train(self, x):
+    def train(self, x, training=False):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
-        # mean = tf.reduce_mean(conv, axis=[0,1,2])
-        # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        # shouldnt this be the same thing ? 
-        mean, var = tf.nn.moments(conv, axes=[0,1,2])
-        std = tf.sqrt(var + 1e-5)
-        
-        # mean = self.mean
-        # std = self.std
+        if training:
+            conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+            # mean = tf.reduce_mean(conv, axis=[0,1,2])
+            # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+            # shouldnt this be the same thing ? 
+            mean, var = tf.nn.moments(conv, axes=[0,1,2])
+            std = tf.sqrt(var + 1e-5)
+        else:
+            mean = self.mean
+            std = self.std
         
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
@@ -284,9 +287,9 @@ class res_block1(layer):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
         
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
+    def train(self, x, training=False):
+        y1 = self.conv1.train(x, training)
+        y2 = self.conv2.train(y1, training)
         y3 = tf.nn.relu(x + y2)
         return y3
 
@@ -321,10 +324,10 @@ class res_block2(layer):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
-        y3 = self.conv3.train(x)
+    def train(self, x, training=False):
+        y1 = self.conv1.train(x, training)
+        y2 = self.conv2.train(y1, training)
+        y3 = self.conv3.train(x, training)
         y4 = tf.nn.relu(y2 + y3)
         return y4
         
@@ -362,7 +365,7 @@ class dense_block(layer):
         self.w = tf.Variable(w, dtype=tf.float32)
         self.b = tf.Variable(b, dtype=tf.float32)
 
-    def train(self, x):
+    def train(self, x, training=False):
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w) + self.b
         return fc
@@ -390,7 +393,7 @@ class avg_pool(layer):
         else:
             self.q = 1
         
-    def train(self, x):        
+    def train(self, x, training=False):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = pool # quantize_and_dequantize(pool, -128, 127)
         return qpool
@@ -433,7 +436,7 @@ class max_pool(layer):
         else:
             self.q = 1
         
-    def train(self, x):        
+    def train(self, x, training=False):        
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool = pool 
         return qpool

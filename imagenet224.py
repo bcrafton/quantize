@@ -62,7 +62,7 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.99
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
-        pred_logits = model.train(x)
+        pred_logits = model.train(x, training=True)
         pred_label = tf.argmax(pred_logits, axis=1)
         loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits))
         correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
@@ -80,31 +80,55 @@ def predict(model, x, y):
 
 ####################################
 
-total = 1285000
-total_correct = 0
-total_loss = 0
-batch_size = 64
+def run_train():
 
-train_flag = True
+    total = 1285000
+    total_correct = 0
+    total_loss = 0
+    batch_size = 50
 
-for epoch in range(2):
-    # load = Loader('/home/brian/Desktop/ILSVRC2012/val')
-    # load = Loader('/home/bcrafton3/Data_SSD/datasets/imagenet224/train/')
-    # load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_val/')
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', batch_size, 8)
     start = time.time()
-    
+
     for batch in range(0, total, batch_size):
         while load.empty(): pass # print ('empty')
         
         x, y = load.pop()
         
-        if train_flag:
-            loss, correct, grad = gradients(model, x, y)
-            optimizer.apply_gradients(zip(grad, params))
-            total_loss += loss.numpy()
-        else:
-            correct = predict(model, x, y)
+        loss, correct, grad = gradients(model, x, y)
+        optimizer.apply_gradients(zip(grad, params))
+        total_loss += loss.numpy()
+        
+        total_correct += correct.numpy()
+        
+        acc = round(total_correct / (batch + batch_size), 3)
+        avg_loss = total_loss / (batch + batch_size)
+        
+        if (batch + batch_size) % (batch_size * 100) == 0:
+            img_per_sec = (batch + batch_size) / (time.time() - start)
+            print (batch + batch_size, img_per_sec, acc, avg_loss)
+
+    load.join()
+
+####################################
+
+def run_val():
+
+    total = 50000
+    total_correct = 0
+    total_loss = 0
+    batch_size = 50
+
+    load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_val/', batch_size, 8)
+
+    start = time.time()
+
+    for batch in range(0, total, batch_size):
+        while load.empty(): pass # print ('empty')
+        
+        x, y = load.pop()
+
+        correct = predict(model, x, y)
 
         total_correct += correct.numpy()
         
@@ -113,17 +137,15 @@ for epoch in range(2):
         
         if (batch + batch_size) % (batch_size * 100) == 0:
             img_per_sec = (batch + batch_size) / (time.time() - start)
-            print (epoch, batch + batch_size, img_per_sec, acc, avg_loss)
+            print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
 
 ####################################
 
-
-
-
-
-
+run_val()
+run_train()
+run_val()
 
 
 
