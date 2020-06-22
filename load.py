@@ -70,6 +70,7 @@ def fill_queue(tid, nthread, batch_size, images, labels, q):
         batch_y = []
         for i in range(batch_size):
             example = batch + tid*batch_size + i
+            assert (example < len(images))
             image = preprocess(images[example])
             batch_x.append(image)
             batch_y.append(labels[example])

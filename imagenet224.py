@@ -22,10 +22,6 @@ def quantize_np(x, low, high):
 
 ####################################
 
-load = Loader('/home/brian/Desktop/ILSVRC2012/val')
-
-####################################
-
 weights = np.load('resnet18.npy', allow_pickle=True).item()
 
 ####################################
@@ -55,7 +51,7 @@ params = model.get_params()
 
 ####################################
 
-optimizer = tf.keras.optimizers.Adam()
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
@@ -79,28 +75,33 @@ def predict(model, x, y):
 
 total = 50000
 total_correct = 0
+total_loss = 0
 batch_size = 32
 
-start = time.time()
-for batch in range(0, total, batch_size):
-    while load.empty(): pass
+for epoch in range(2):
+    load = Loader('/home/brian/Desktop/ILSVRC2012/val')
+    start = time.time()
     
-    x, y = load.pop()
-    
-    # loss, correct, grad = gradients(model, x, y)
-    # optimizer.apply_gradients(zip(grad, params))
-    
-    correct = predict(model, x, y)
-    total_correct += correct
+    for batch in range(0, total, batch_size):
+        while load.empty(): pass
+        
+        x, y = load.pop()
+        
+        loss, correct, grad = gradients(model, x, y)
+        optimizer.apply_gradients(zip(grad, params))
+        
+        # correct = predict(model, x, y)
+        total_correct += correct.numpy()
+        total_loss += np.sum(loss.numpy())
+        
+        acc = round(total_correct / (batch + batch_size), 3)
+        avg_loss = total_loss / (batch + batch_size)
 
-    print (round(total_correct.numpy() / (batch + batch_size), 2))
+        print (epoch, batch, acc, avg_loss)
 
-load.join()
+    load.join()
 
 ####################################
-
-
-
 
 
 

@@ -180,29 +180,24 @@ class conv_block(layer):
             self.g = tf.Variable(g, dtype=tf.float32)
             self.b = tf.Variable(b, dtype=tf.float32)
             
-            self.mean = tf.Variable(mean, dtype=tf.float32)
-            self.std = tf.Variable(np.sqrt(var + 1e-5), dtype=tf.float32)
+            self.mean = tf.constant(mean, dtype=tf.float32)
+            self.std = tf.constant(np.sqrt(var + 1e-5), dtype=tf.float32)
             
         else:
             assert (False)
 
     def train(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-
+        '''
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         # mean = tf.reduce_mean(conv, axis=[0,1,2])
         # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         # shouldnt this be the same thing ? 
-        mean, var = tf.nn.moments(conv, axes=[0,1,2]) 
+        mean, var = tf.nn.moments(conv, axes=[0,1,2])
         std = tf.sqrt(var + 1e-5)
-        
+        '''
         mean = self.mean
         std = self.std
-        
-        #tf.print(self.weight_id)
-        #tf.print(std)
-        #tf.print(self.std)
-        #tf.print()
         
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
