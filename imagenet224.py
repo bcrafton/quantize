@@ -62,7 +62,6 @@ def gradients(model, x, y):
         pred_logits = model.train(x)
         pred_label = tf.argmax(pred_logits, axis=1)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits)
-        print (tf.shape(y), tf.shape(pred_label))
         correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     
     grad = tape.gradient(loss, params)
@@ -80,7 +79,7 @@ def predict(model, x, y):
 
 total = 50000
 total_correct = 0
-batch_size = 10
+batch_size = 32
 
 start = time.time()
 for batch in range(0, total, batch_size):
@@ -94,7 +93,7 @@ for batch in range(0, total, batch_size):
     correct = predict(model, x, y)
     total_correct += correct
 
-    print (total_correct.numpy(), (batch + batch_size))
+    print (round(total_correct.numpy() / (batch + batch_size), 2))
 
 load.join()
 

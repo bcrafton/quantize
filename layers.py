@@ -23,23 +23,29 @@ def floor_no_grad(x):
     return tf.floor(x), grad
     
 #############
+    
+@tf.custom_gradient
+def round_no_grad(x):
+
+    def grad(dy):
+        return dy
+    
+    return tf.round(x), grad
+    
+#############
 
 def quantize_and_dequantize(x, low, high):
-    # g = tf.get_default_graph()
-    # with g.gradient_override_map({"Floor": "Identity"}):
     scale = tf.reduce_max(tf.abs(x)) / high
     x = x / scale
-    x = floor_no_grad(x)
+    x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     x = x * scale
     return x
 
 def quantize(x, low, high):
-    # g = tf.get_default_graph()
-    # with g.gradient_override_map({"Floor": "Identity"}):
     scale = tf.reduce_max(tf.abs(x)) / high
     x = x / scale
-    x = floor_no_grad(x)
+    x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     return x, scale
     
@@ -148,9 +154,11 @@ class conv_block(layer):
         if 'g' in weights[self.weight_id].keys():
             f, b, g, mean, var = weights[self.weight_id]['f'], weights[self.weight_id]['b'], weights[self.weight_id]['g'], weights[self.weight_id]['mean'], weights[self.weight_id]['var']
             
+            '''
             var = np.sqrt(var + 1e-5)
             f = f * (g / var)
             b = b - (g / var) * mean
+            '''
             
             #############################
             
@@ -168,47 +176,45 @@ class conv_block(layer):
             
             #############################
 
-            # qf, scale = quantize_np(f, -128, 127)
-            # qb = b / scale
-            
             self.f = tf.Variable(f, dtype=tf.float32)
             self.g = tf.Variable(g, dtype=tf.float32)
             self.b = tf.Variable(b, dtype=tf.float32)
             
-            # self.scale = tf.Variable(scale, dtype=tf.float32)
+            self.mean = tf.Variable(mean, dtype=tf.float32)
+            self.std = tf.Variable(np.sqrt(var + 1e-5), dtype=tf.float32)
             
         else:
-        
-            f, b = weights[self.weight_id]['f'], weights[self.weight_id]['b']
-
-            qf, scale = quantize_np(f, -128, 127)
-            qb = b / scale
-            
-            self.f     = tf.Variable(qf,    dtype=tf.float32)
-            self.b     = tf.Variable(qb,    dtype=tf.float32)
-            self.scale = tf.Variable(scale, dtype=tf.float32)
+            assert (False)
 
     def train(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        '''
-        conv = tf.nn.conv2d(x_pad, self.f, [1,1,1,1], 'VALID') # there is no bias when we have bn.
-        mean = tf.reduce_mean(conv, axis=[0,1,2])
-        _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
-        # mean, var = tf.nn.moments(conv, axes=[0,1,2])
+
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+        # mean = tf.reduce_mean(conv, axis=[0,1,2])
+        # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+        # shouldnt this be the same thing ? 
+        mean, var = tf.nn.moments(conv, axes=[0,1,2]) 
         std = tf.sqrt(var + 1e-5)
+        
+        mean = self.mean
+        std = self.std
+        
+        #tf.print(self.weight_id)
+        #tf.print(std)
+        #tf.print(self.std)
+        #tf.print()
         
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
         qf = quantize_and_dequantize(fold_f, -128, 127)
-        # qb = quantize_and_dequantize(fold_b, -128, 127) 
-        '''
+        qb = fold_b
         
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         
         if self.relu: out = tf.nn.relu(conv)
         else:         out = conv
 
-        # out = quantize_and_dequantize(out, -128, 127)
+        out = quantize_and_dequantize(out, -128, 127)
         return out
         
     '''

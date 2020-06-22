@@ -103,7 +103,7 @@ class Loader:
         
         self.threads = []
         self.nthread = 4
-        self.batch_size = 10
+        self.batch_size = 32
         
         for tid in range(self.nthread):
             thread = Process(target=fill_queue, args=(tid, self.nthread, self.batch_size, self.images, self.labels, self.q))
