@@ -82,7 +82,7 @@ def predict(model, x, y):
 
 def run_train():
 
-    total = 1285000
+    total = 1281150
     total_correct = 0
     total_loss = 0
     batch_size = 50

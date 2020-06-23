@@ -70,7 +70,10 @@ def fill_queue(tid, nthread, batch_size, images, labels, q):
         batch_y = []
         for i in range(batch_size):
             example = batch + tid*batch_size + i
-            assert (example < len(images))
+            # assert (example < len(images))
+            if example >= len(images):
+                return 
+
             image = preprocess(images[example])
             batch_x.append(image)
             batch_y.append(labels[example])
@@ -110,6 +113,14 @@ class Loader:
         merge = list(zip(self.images, self.labels))
         random.shuffle(merge)
         self.images, self.labels = zip(*merge)
+
+        remainder = len(self.images) % self.batch_size
+        if remainder: 
+            self.images = self.images[:(-remainder)]
+            self.labels = self.labels[:(-remainder)]
+
+        # print (len(self.images))
+        # print (len(self.labels))
 
         ##############################
         
