@@ -80,6 +80,14 @@ def predict(model, x, y):
 
 ####################################
 
+def collect(model, x, y):
+    pred_logits, stats = model.collect(x)
+    pred_label = tf.argmax(pred_logits, axis=1)
+    correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
+    return correct, stats
+
+####################################
+
 def run_train():
 
     # total = 1281150
@@ -109,6 +117,55 @@ def run_train():
             img_per_sec = (batch + batch_size) / (time.time() - start)
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
+    load.join()
+
+####################################
+
+def accumulate_stats(sum_stats, stats, scale):
+    if not sum_stats.keys():
+        for layer in stats.keys():
+            sum_stats[layer] = {}
+            for stat in stats[layer].keys():
+                sum_stats[layer][stat] = scale * stats[layer][stat]
+    else:
+        for layer in stats.keys():
+            for stat in stats[layer].keys():
+                sum_stats[layer][stat] += scale * stats[layer][stat]
+                
+def run_collect():
+
+    # total = 1281150
+    total = 35000
+    total_correct = 0
+    total_loss = 0
+    batch_size = 50
+
+    load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
+    start = time.time()
+
+    sum_stats = {}
+
+    for batch in range(0, total, batch_size):
+        while load.empty(): pass # print ('empty')
+        
+        x, y = load.pop()
+        
+        # loss, correct, grad = gradients(model, x, y)
+        # optimizer.apply_gradients(zip(grad, params))
+        # total_loss += loss.numpy()
+        
+        correct, stats = collect(model, x, y)
+        accumulate_stats(sum_stats, stats, batch_size / total)
+
+        total_correct += correct.numpy()
+        acc = round(total_correct / (batch + batch_size), 3)
+        avg_loss = total_loss / (batch + batch_size)
+        
+        if (batch + batch_size) % (batch_size * 100) == 0:
+            img_per_sec = (batch + batch_size) / (time.time() - start)
+            print (batch + batch_size, img_per_sec, acc, avg_loss)
+
+    np.save('bn_stats', sum_stats)
     load.join()
 
 ####################################
