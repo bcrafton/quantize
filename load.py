@@ -62,17 +62,14 @@ def preprocess(filename):
 
 #########################################
 
-def fill_queue(tid, nthread, batch_size, images, labels, q):
-    for batch in range(0, len(images), batch_size * nthread):
-        # print (batch + tid*batch_size)
+def fill_queue(tid, nbatch, batch_size, nthread, images, labels, q):
+    for batch in range(tid, nbatch, nthread):
         while q.full(): pass
         batch_x = []
         batch_y = []
         for i in range(batch_size):
-            example = batch + tid*batch_size + i
-            # assert (example < len(images))
-            if example >= len(images):
-                return 
+            example = batch*batch_size + i
+            assert (example < nbatch * batch_size)
 
             image = preprocess(images[example])
             batch_x.append(image)
@@ -86,12 +83,13 @@ def fill_queue(tid, nthread, batch_size, images, labels, q):
 
 class Loader:
 
-    def __init__(self, path, batch_size, nthread):
+    def __init__(self, path, nbatch, batch_size, nthread):
       
         ##############################
     
         self.path = path
         self.q = Queue(maxsize=32)
+        self.nbatch = nbatch
         self.batch_size = batch_size
         self.nthread = nthread
 
@@ -125,9 +123,8 @@ class Loader:
         ##############################
         
         self.threads = []
-        
         for tid in range(self.nthread):
-            thread = Process(target=fill_queue, args=(tid, self.nthread, self.batch_size, self.images, self.labels, self.q))
+            thread = Process(target=fill_queue, args=(tid, self.nbatch, self.batch_size, self.nthread, self.images, self.labels, self.q))
             thread.start()
             self.threads.append(thread)
 
@@ -142,8 +139,9 @@ class Loader:
 
     def full(self):
         return self.q.full()
-        
+
     def join(self):
+        assert (self.q.empty())
         for tid in range(self.nthread):
             self.threads[tid].join()
 
