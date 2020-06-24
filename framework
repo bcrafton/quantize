@@ -73,6 +73,62 @@ wonder if we setup this dataset if we can use the distributed training ...
 
 > trained quantized network goes from 67.8->68.8 which is solid.
 
+===========
+
+On Local machine with good images:
+> 69.3 -> 70.1 after training quantized network
+
+===========
+
+worried that that variance thing just worked ...
+> we just averaged it and got it first time ...
+
+> run collect script with quantization
+> find largest scale value
+> xcale is taken care of by batch norm
+
+===========
+
+we need to implement our idea for ResBlocks
+> give more than 255b to layer with higher output.
+
+===========
+
+> yeah so once again res blocks are being the problem
+
+initial idea was pass {qx, x} everywhere 
+so we can just do 
+
+x + y1
+in resblock
+rather than 
+qx + qy1
+
+but that dosnt work
+because we scale the weights, but not the activations
+
+===========
+
+best new idea
+is just finding the y_scale during training or something.
+
+===========
+
+hmm
+what about passing y / scale through
+and just doing it all during collection ? 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
