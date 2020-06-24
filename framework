@@ -1,0 +1,83 @@
+
+===========
+
+we need some framework we can train:
+> ResNet
+> Yolo
+> VGG
+
+===========
+
+> So we cant use these quantization packages to train ? 
+  > TensorFlow -> TFLITE Buffer
+  > PyTorch dosnt do Integer only
+  > capped out on post-train integer-only accuracy ? 
+
+===========
+
+> We can just be happy with 66% accuracy ? 
+  > 69.4 -> 66 is HUGE fall off.
+  > Acc w/ noise
+  > Too sparse
+  > VGG on CIFAR
+
+===========
+
+https://www.tensorflow.org/guide/distributed_training
+
+> definitely think we should give this a go.
+> means we likely have to create tfrecords tho ...
+
+should test on cifar first tho to make sure we like it first.
+
+> 150 img/sec
+> this feels incredibly slow ...
+> what is inference performance ? 
+  > might be a better indication of how slow ...
+
+8 V100s to train ResNet50 @ 120 minutes
+> probably atleast 100x faster than ours
+
+===========
+
+> loading from HDD
+> not using tensorflow input pipeline
+> quantize 
+> transforming weights each each batch ...
+
+wonder if we setup this dataset if we can use the distributed training ...
+
+===========
+
+> write better stop conditions code.
+
+> load.end()
+  > give flag to each thread saying stop ? 
+    > might not see shared memory ...
+  
+> while load.done() ...
+
+===========
+
+> running stuff now
+> augment script to load in new weights and batch norm stuff.
+
+> start the event based shit.
+
+===========
+
+> so why the fuck are we @ 68.5 right now ? 
+  > had 69.6 at one point ...
+  > YUP images on server must be corrupted lol.
+  > running on laptop with higher accuracy.
+
+> trained quantized network goes from 67.8->68.8 which is solid.
+
+
+
+
+
+
+
+
+
