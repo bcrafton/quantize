@@ -262,15 +262,11 @@ class res_block1(layer):
         stats = {}
         qy1, y1, stat1 = self.conv1.collect(qx, x)
         qy2, y2, stat2 = self.conv2.collect(qy1, y1)
+        scale = tf.reduce_max(tf.abs(x)) / tf.reduce_max(tf.abs(y2))
+
         y3 = tf.nn.relu(x + y2)
-        out, sout = quantize(y3, -128, 127)
-        '''
-        max_x = tf.reduce_max(tf.abs(x))
-        max_y = tf.reduce_max(tf.abs(y1))
-        max_out = tf.reduce_max(tf.abs(out))
-        max_y3 = tf.reduce_max(tf.abs(y3))
-        tf.print((self.layer_id, self.conv1.layer_id, self.conv2.layer_id), max_x, max_y, max_y3)
-        '''
+        out, sout = quantize(tf.nn.relu(scale * qx + qy2), -128, 127)
+
         stats.update(stat1)
         stats.update(stat2)
         return out, y3, stats
@@ -318,8 +314,10 @@ class res_block2(layer):
         qy1, y1, stat1 = self.conv1.collect(qx, x)
         qy2, y2, stat2 = self.conv2.collect(qy1, y1)
         qy3, y3, stat3 = self.conv3.collect(qx, x)
+        scale = tf.reduce_max(tf.abs(y2)) / tf.reduce_max(tf.abs(y3))
+
         y4 = tf.nn.relu(y2 + y3)
-        out, sout = quantize(y4, -128, 127)
+        out, sout = quantize(tf.nn.relu(scale * qy2 + qy3), -128, 127)
 
         stats.update(stat1)
         stats.update(stat2)
