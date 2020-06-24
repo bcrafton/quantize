@@ -376,11 +376,6 @@ class avg_pool(layer):
         self.s = s
         self.p = p
         
-        if weights:
-            self.q = weights['y']
-        else:
-            self.q = 1
-        
     def train(self, x, training=False):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
@@ -407,11 +402,6 @@ class max_pool(layer):
     
         self.s = s
         self.p = p
-        
-        if weights:
-            self.q = weights['y']
-        else:
-            self.q = 1
         
     def train(self, x, training=False):        
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
