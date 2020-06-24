@@ -91,7 +91,7 @@ def collect(model, x, y):
 def run_train():
 
     # total = 1281150
-    total = 35000
+    total = 1000000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -118,6 +118,8 @@ def run_train():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
+    trained_weights = model.get_weights()
+    np.save('trained_weights', trained_weights)
 
 ####################################
 
@@ -135,7 +137,7 @@ def accumulate_stats(sum_stats, stats, scale):
 def run_collect():
 
     # total = 1281150
-    total = 35000
+    total = 1000000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -165,8 +167,8 @@ def run_collect():
             img_per_sec = (batch + batch_size) / (time.time() - start)
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
-    np.save('bn_stats', sum_stats)
     load.join()
+    np.save('bn_stats', sum_stats)
 
 ####################################
 
@@ -201,12 +203,16 @@ def run_val():
 
 ####################################
 
-run_val()
+# run_val()
+# run_train()
+# run_val()
+
+####################################
+
 run_train()
-run_val()
+run_collect()
 
-
-
+####################################
 
 
 

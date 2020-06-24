@@ -90,7 +90,7 @@ class model:
         for layer in self.layers:
             y, stat = layer.collect(y)
             stats.update(stat)
-        return y
+        return y, stats
     
     def get_weights(self):
         weights_dict = {}
@@ -227,7 +227,7 @@ class conv_block(layer):
     
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_id] = {'f': self.f, 'g': self.g, 'b': self.b}
+        weights_dict[self.weight_id] = {'f': self.f, 'g': self.g, 'b': self.b}
         return weights_dict
 
     def get_params(self):
@@ -256,8 +256,8 @@ class res_block1(layer):
 
     def collect(self, x):
         stats = {}
-        y1, stat1 = self.conv1.train(x, training)
-        y2, stat2 = self.conv2.train(y1, training)
+        y1, stat1 = self.conv1.collect(x)
+        y2, stat2 = self.conv2.collect(y1)
         y3 = tf.nn.relu(x + y2)
         
         stats.update(stat1)
@@ -304,9 +304,9 @@ class res_block2(layer):
 
     def collect(self, x):
         stats = {}
-        y1, stat1 = self.conv1.train(x, training)
-        y2, stat2 = self.conv2.train(y1, training)
-        y3, stat3 = self.conv3.train(x, training)
+        y1, stat1 = self.conv1.collect(x)
+        y2, stat2 = self.conv2.collect(y1)
+        y3, stat3 = self.conv3.collect(x)
         y4 = tf.nn.relu(y2 + y3)
         
         stats.update(stat1)
@@ -391,7 +391,8 @@ class avg_pool(layer):
     
     def get_weights(self):    
         weights_dict = {}
-        weights_dict[self.layer_id] = {}
+        # be careful with layer_id/weight_id
+        # weights_dict[self.layer_id] = {}
         return weights_dict
         
     def get_params(self):
@@ -422,7 +423,8 @@ class max_pool(layer):
     
     def get_weights(self):    
         weights_dict = {}
-        weights_dict[self.layer_id] = {}
+        # be careful with layer_id/weight_id
+        # weights_dict[self.layer_id] = {}
         return weights_dict
 
     def get_params(self):
