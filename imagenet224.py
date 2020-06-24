@@ -6,15 +6,22 @@ from load import Loader
 import time
 
 ####################################
+
+train_flag = False
+
+####################################
+
 '''
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
     tf.config.experimental.set_memory_growth(device, True)
 '''
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 gpu = gpus[0]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
+
 ####################################
 
 def quantize_np(x, low, high):
@@ -26,7 +33,17 @@ def quantize_np(x, low, high):
 
 ####################################
 
-weights = np.load('resnet18.npy', allow_pickle=True).item()
+if train_flag:
+    weights = np.load('resnet18.npy', allow_pickle=True).item()
+else:
+    weights = np.load('resnet18.npy', allow_pickle=True).item()
+    '''
+    weights = np.load('trained_weights.npy', allow_pickle=True).item()
+    stats = np.load('bn_stats.npy', allow_pickle=True).item()
+    for layer in stats.keys():
+        for stat in stats[layer].keys():
+            weights[layer][stat] = stats[layer][stat]
+    '''
 
 ####################################
 
@@ -203,14 +220,11 @@ def run_val():
 
 ####################################
 
-# run_val()
-# run_train()
-# run_val()
-
-####################################
-
-run_train()
-run_collect()
+if train_flag:
+    run_train()
+    run_collect()
+else:
+    run_val()
 
 ####################################
 
