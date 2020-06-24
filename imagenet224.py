@@ -7,7 +7,7 @@ import time
 
 ####################################
 
-train_flag = False
+train_flag = True
 
 ####################################
 
@@ -18,7 +18,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[0]
+gpu = gpus[1]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -71,7 +71,7 @@ dense_block(512, 1000, weights=weights)
 params = model.get_params()
 
 ####################################
-
+'''
 # optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
 optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1.)
 # optimizer = tf.keras.optimizers.Adam(learning_rate=1e-1, beta_1=0.9, beta_2=0.999, epsilon=1.)
@@ -86,7 +86,7 @@ def gradients(model, x, y):
     
     grad = tape.gradient(loss, params)
     return loss, correct, grad
-
+'''
 ####################################
 
 def predict(model, x, y):
@@ -108,7 +108,7 @@ def collect(model, x, y):
 def run_train():
 
     # total = 1281150
-    total = 1000000
+    total = 100000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -154,10 +154,10 @@ def accumulate_stats(sum_stats, stats, scale):
 def run_collect():
 
     # total = 1281150
-    total = 1000000
+    total = 100000
     total_correct = 0
     total_loss = 0
-    batch_size = 50
+    batch_size = 100
 
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
     start = time.time()
@@ -221,7 +221,7 @@ def run_val():
 ####################################
 
 if train_flag:
-    run_train()
+    # run_train()
     run_collect()
 else:
     run_val()
