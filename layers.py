@@ -227,11 +227,11 @@ class conv_block(layer):
 
         # out = quantize_and_dequantize(out, -128, 127)
         qout, sout = quantize(out, -128, 127)
-        return qout, out * sf, {self.weight_id: {'std': std, 'mean': mean}}
+        return qout, out * sf, {self.layer_id: {'std': std, 'mean': mean, 'scale': sf}}
     
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.weight_id] = {'f': self.f, 'g': self.g, 'b': self.b}
+        weights_dict[self.layer_id] = {'f': self.f, 'g': self.g, 'b': self.b}
         return weights_dict
 
     def get_params(self):
@@ -269,6 +269,7 @@ class res_block1(layer):
 
         stats.update(stat1)
         stats.update(stat2)
+        stats[self.layer_id] = {'scale': scale}
         return out, y3, stats
 
     def get_weights(self):
@@ -322,6 +323,7 @@ class res_block2(layer):
         stats.update(stat1)
         stats.update(stat2)
         stats.update(stat3)
+        stats[self.layer_id] = {'scale': scale}
         return out, y4, stats
 
     def get_weights(self):
@@ -370,7 +372,7 @@ class dense_block(layer):
 
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.weight_id] = {'w': self.w, 'b': self.b}
+        weights_dict[self.layer_id] = {'w': self.w, 'b': self.b}
         return weights_dict
         
     def get_params(self):
@@ -397,8 +399,6 @@ class avg_pool(layer):
     
     def get_weights(self):    
         weights_dict = {}
-        # be careful with layer_id/weight_id
-        # weights_dict[self.layer_id] = {}
         return weights_dict
         
     def get_params(self):
@@ -425,8 +425,6 @@ class max_pool(layer):
     
     def get_weights(self):    
         weights_dict = {}
-        # be careful with layer_id/weight_id
-        # weights_dict[self.layer_id] = {}
         return weights_dict
 
     def get_params(self):
