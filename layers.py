@@ -86,12 +86,11 @@ class model:
     
     def collect(self, x):
         y = x
-        qy = y
         stats = {}
         for layer in self.layers:
-            qy, y, stat = layer.collect(qy, y)
+            y, stat = layer.collect(y)
             stats.update(stat)
-        return qy, stats
+        return y, stats
     
     def get_weights(self):
         weights_dict = {}
@@ -206,8 +205,8 @@ class conv_block(layer):
         out = quantize_and_dequantize(out, -128, 127)
         return out
         
-    def collect(self, qx, x):
-        x_pad = tf.pad(qx, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+    def collect(self, x):
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean, var = tf.nn.moments(conv, axes=[0,1,2])
@@ -227,7 +226,7 @@ class conv_block(layer):
 
         # out = quantize_and_dequantize(out, -128, 127)
         qout, sout = quantize(out, -128, 127)
-        return qout, out * sf, {self.layer_id: {'std': std, 'mean': mean, 'scale': sf}}
+        return qout, {self.layer_id: {'std': std, 'mean': mean, 'scale': sf}}
     
     def get_weights(self):
         weights_dict = {}
@@ -258,19 +257,17 @@ class res_block1(layer):
         y3 = tf.nn.relu(x + y2)
         return y3
 
-    def collect(self, qx, x):
+    def collect(self, x):
         stats = {}
-        qy1, y1, stat1 = self.conv1.collect(qx, x)
-        qy2, y2, stat2 = self.conv2.collect(qy1, y1)
-        scale = tf.reduce_max(tf.abs(x)) / tf.reduce_max(tf.abs(y2))
-
+        y1, stat1 = self.conv1.collect(x)
+        y2, stat2 = self.conv2.collect(y1)
         y3 = tf.nn.relu(x + y2)
-        out, sout = quantize(tf.nn.relu(scale * qx + qy2), -128, 127)
+        out, scale = quantize(y3, -128, 127)
 
         stats.update(stat1)
         stats.update(stat2)
         stats[self.layer_id] = {'scale': scale}
-        return out, y3, stats
+        return out, stats
 
     def get_weights(self):
         weights_dict = {}
@@ -310,21 +307,20 @@ class res_block2(layer):
         y4 = tf.nn.relu(y2 + y3)
         return y4
 
-    def collect(self, qx, x):
+    def collect(self, x):
         stats = {}
-        qy1, y1, stat1 = self.conv1.collect(qx, x)
-        qy2, y2, stat2 = self.conv2.collect(qy1, y1)
-        qy3, y3, stat3 = self.conv3.collect(qx, x)
-        scale = tf.reduce_max(tf.abs(y2)) / tf.reduce_max(tf.abs(y3))
+        y1, stat1 = self.conv1.collect(x)
+        y2, stat2 = self.conv2.collect(y1)
+        y3, stat3 = self.conv3.collect(x)
 
         y4 = tf.nn.relu(y2 + y3)
-        out, sout = quantize(tf.nn.relu(scale * qy2 + qy3), -128, 127)
+        out, scale = quantize(y4, -128, 127)
 
         stats.update(stat1)
         stats.update(stat2)
         stats.update(stat3)
         stats[self.layer_id] = {'scale': scale}
-        return out, y4, stats
+        return out, stats
 
     def get_weights(self):
         weights_dict = {}
@@ -365,10 +361,10 @@ class dense_block(layer):
         fc = tf.matmul(x, self.w) + self.b
         return fc
 
-    def collect(self, qx, x):
-        qx = tf.reshape(qx, (-1, self.isize))
-        fc = tf.matmul(qx, self.w) + self.b
-        return fc, fc, {}
+    def collect(self, x):
+        x = tf.reshape(x, (-1, self.isize))
+        fc = tf.matmul(x, self.w) + self.b
+        return fc, {}
 
     def get_weights(self):
         weights_dict = {}
@@ -392,10 +388,9 @@ class avg_pool(layer):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
-    def collect(self, qx, x):
-        qpool = tf.nn.avg_pool(qx, ksize=self.p, strides=self.s, padding="SAME")
+    def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return qpool, pool, {}
+        return pool, {}
     
     def get_weights(self):    
         weights_dict = {}
@@ -418,10 +413,9 @@ class max_pool(layer):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
     
-    def collect(self, qx, x):
-        qpool = tf.nn.max_pool(qx, ksize=self.p, strides=self.s, padding="SAME")
+    def collect(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return qpool, pool, {}
+        return pool, {}
     
     def get_weights(self):    
         weights_dict = {}

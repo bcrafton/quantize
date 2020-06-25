@@ -118,8 +118,24 @@ hmm
 what about passing y / scale through
 and just doing it all during collection ? 
 
+===========
 
+so current setup is almost there
+thinking the problem is collecting mean,var,scale at the same time.
 
+because mean and var change as a function of scale.
+
+===========
+
+theory = cannot change scale and {mean, var} together.
+need to do 2 separate collects
+
+===========
+
+> choose quantization values from collections
+> collect mean and standard deviation
+
+===========
 
 
 

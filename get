@@ -1,0 +1,6 @@
+
+scp bcrafton3@icsrl-srv2.ece.gatech.edu:/usr/scratch/bcrafton/trained_weights.npy .
+scp bcrafton3@icsrl-srv2.ece.gatech.edu:/usr/scratch/bcrafton/bn_stats.npy .
+
+scp bcrafton3@icsrl-exxact1.ece.gatech.edu:/home/bcrafton3/quantize/bn_stats.npy .
+scp bcrafton3@icsrl-exxact1.ece.gatech.edu:/home/bcrafton3/quantize/trained_weights.npy .
