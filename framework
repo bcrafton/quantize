@@ -137,6 +137,32 @@ need to do 2 separate collects
 
 ===========
 
+so we figured out quantization I think.
+
+> Why not do floating point for CC ?
+> Why not just run the 8b matmul in PCM and then do the rest of stuff same as Pytorch ? 
+
+if we want 8b everything, there are a few options
+
+1)
+scale value for {x, y2} {y2, y3} 
+bc we scale all layers to (-128, 127) we lose information about how they can be combined.
+so in the resblock u get fucked
+cannot scale back by w, because what happens when you have {x, y2} ???
+
+2)
+> before we set a range for each layer based on largest output value in the network
+> collected a ton of activations 1 layer by 1 layer
+> ymax=14 -> instead of 40 so not everything got crushed by the max value
+
+so if u want a good mehtod u need another format that all layers can be brought to and added together effectively
+
+so fixed point or floating point @ 16-32 bits
+
+
+===========
+
+
 
 
 
