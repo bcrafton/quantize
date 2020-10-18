@@ -50,6 +50,7 @@ params = model.get_params()
 
 optimizer = tf.keras.optimizers.Adam()
 
+@tf.function(experimental_relax_shapes=False)
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
         pred_logits = model.train(x)
@@ -70,47 +71,61 @@ def predict(model, x, y):
 
 ####################################
 
-batch_size = 50
-for epoch in range(5):
-    total_correct = 0
-    for batch in range(0, len(x_train), batch_size):
-        print (batch)
-    
-        xs = x_train[batch:batch+batch_size]
-        ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int32)
-        
-        loss, correct, grad = gradients(model, xs, ys)
-        optimizer.apply_gradients(zip(grad, params))
-
-        total_correct += correct
-        
-    print (total_correct / len(x_train) * 100)
+def collect(model, x, y):
+    pred_logits, stats = model.collect(x)
+    pred_label = tf.argmax(pred_logits, axis=1)
+    correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
+    return correct, stats
 
 ####################################
 
-model.save('./results')
+def accumulate_stats(sum_stats, stats, scale):
+    if not sum_stats.keys():
+        for layer in stats.keys():
+            sum_stats[layer] = {}
+            for stat in stats[layer].keys():
+                sum_stats[layer][stat] = scale * stats[layer][stat]
+    else:
+        for layer in stats.keys():
+            for stat in stats[layer].keys():
+                sum_stats[layer][stat] += scale * stats[layer][stat]
 
 ####################################
 
 batch_size = 50
 total_correct = 0
 for batch in range(0, len(x_train), batch_size):
-    xs = x_train[batch:batch+batch_size]
-    ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int32)
-    
-    correct = predict(model, xs, ys)
+    xs = x_train[batch:batch+batch_size].astype(np.float32)
+    ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int64)
+    loss, correct, grad = gradients(model, xs, ys)
+    optimizer.apply_gradients(zip(grad, params))
     total_correct += correct
     
 print (total_correct / len(x_train) * 100)
 
 ####################################
 
+# TODO want to move collect inside of the model using .numpy()
 
+sum_stats = {}
 
+batch_size = 50
+total_correct = 0
+for batch in range(0, len(x_train), batch_size):
+    xs = x_train[batch:batch+batch_size].astype(np.float32)
+    ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int64)
 
+    correct, stats = collect(model, xs, ys)
+    accumulate_stats(sum_stats, stats, batch_size / len(x_train))
+    total_correct += correct
 
+np.save('bn_stats', sum_stats)
+print (total_correct / len(x_train) * 100)
 
+####################################
 
+model.save('cifar10_weights')
+np.save('bn_stats', sum_stats)
 
 
 

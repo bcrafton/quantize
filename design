@@ -1,0 +1,81 @@
+> tf2 
+  > no imagenet224
+
+> tf2 <> tf2_srv4
+  > no cifar10 regular
+  
+> fresh[1,2]
+  > no cifar
+  > pytorch shit
+  
+there are so few files.
+but such a disaster.
+
+> inference
+  > yeah ... yikes.
+  
+-----
+-----
+
+> dont look for cifar -> clearly dosnt exist
+> guess we gotta make it work for cifar given resnet.
+
+doing diff on layers between these different branches is whack as well.
+
+code is so different for some reason
+
+-----
+-----
+
+wow - so it seems like we switched to tensorflow2 ... on branch tf2.
+so we def want tf2 or later.
+
+tf2_resnet dosnt have cifar10
+also it dosnt seem like it does training either
+because it automatically assumes we are starting with weights.
+
+-----
+-----
+
+tf2 -> tf2_resnet -> tf2_srv -> tf_srv4
+> last commit @ tf2_resnet NOT used in tf2_srv
+
+-----
+-----
+
+should get whatever remaining commits are left on server for quantize
+
+nothing there.
+
+-----
+-----
+
+(1)
+> two different scales (weight scale, activation scale)
+> collect -> quantize weights -> collect activation scaling
+
+(2)
+move collect inside, use .numpy() to collect {scale, std, mean}
+
+-----
+-----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
