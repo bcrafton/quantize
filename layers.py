@@ -123,6 +123,8 @@ class conv_block(layer):
             f     = weights[self.layer_id]['f']
             b     = weights[self.layer_id]['b']
             q     = weights[self.layer_id]['q']
+            assert (np.all(f % 1) == 0)
+            assert (np.all(b % 1) == 0)
 
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
@@ -217,6 +219,8 @@ class dense_block(layer):
         if weights:
             print (weights[self.layer_id].keys())
             w, b, q = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['q']
+            assert (np.all(w % 1) == 0)
+            assert (np.all(b % 1) == 0)
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
             self.q = q

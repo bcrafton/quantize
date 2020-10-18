@@ -63,14 +63,14 @@ def predict(model, x, y):
 
 batch_size = 50
 total_correct = 0
-for batch in range(0, len(x_train), batch_size):
-    xs = x_train[batch:batch+batch_size].astype(np.float32)
-    ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int64)
+for batch in range(0, len(x_test), batch_size):
+    xs = x_test[batch:batch+batch_size].astype(np.float32)
+    ys = y_test[batch:batch+batch_size].reshape(-1).astype(np.int64)
 
     correct = predict(model, xs, ys)
     total_correct += correct
 
-print (total_correct / len(x_train) * 100)
+print (total_correct / len(x_test) * 100)
 
 ####################################
 
