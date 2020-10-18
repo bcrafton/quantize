@@ -35,14 +35,17 @@ x_test = quantize_np(x_test, 0, 127)
 ####################################
 
 model = model(layers=[
-conv_block(3,   64, 1, weights=weights),
-conv_block(64,  64, 2, weights=weights),
+conv_block(3,   64, weights=weights),
+conv_block(64,  64, weights=weights),
+avg_pool(2, 2),
 
-conv_block(64,  128, 1, weights=weights),
-conv_block(128, 128, 2, weights=weights),
+conv_block(64,  128, weights=weights),
+conv_block(128, 128, weights=weights),
+avg_pool(2, 2),
 
-conv_block(128, 256, 1, weights=weights),
-conv_block(256, 256, 2, weights=weights),
+conv_block(128, 256, weights=weights),
+conv_block(256, 256, weights=weights),
+avg_pool(2, 2),
 
 avg_pool(4, 4),
 dense_block(256, 10, weights=weights)

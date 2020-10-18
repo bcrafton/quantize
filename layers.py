@@ -111,13 +111,12 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, p, weights=None):
+    def __init__(self, f1, f2, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
         self.f1 = f1
         self.f2 = f2
-        self.p = p
 
         if weights:
             print (weights[self.layer_id].keys())
@@ -152,10 +151,9 @@ class conv_block(layer):
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
         relu = tf.nn.relu(conv)
-        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
-        qpool = quantize_and_dequantize(pool, -128, 127)
-        return qpool
+        qout = quantize_and_dequantize(relu, -128, 127)
+        return qout
     
     def collect(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
@@ -170,24 +168,22 @@ class conv_block(layer):
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
         relu = tf.nn.relu(conv)
-        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
 
-        qpool, spool = quantize(pool, -128, 127)
+        qout, sout = quantize(relu, -128, 127)
 
         n, h, w, c = np.shape(x)
         self.std += std.numpy()
         self.mean += mean.numpy()
-        self.scale += spool.numpy()
+        self.scale += sout.numpy()
         self.total += 1
 
-        return qpool
+        return qout
 
     def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
         relu = tf.nn.relu(conv)
-        pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
-        qpool = quantize_predict(pool, self.q, -128, 127)
-        return qpool
+        qout = quantize_predict(relu, self.q, -128, 127)
+        return qout
         
     def get_weights(self):
         weights_dict = {}
