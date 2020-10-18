@@ -21,10 +21,6 @@ def quantize_np(x, low, high):
 ####################################
 
 weights = np.load('cifar10_weights.npy', allow_pickle=True).item()
-stats = np.load('bn_stats.npy', allow_pickle=True).item()
-
-for layer in stats.keys():
-    weights[layer].update(stats[layer])
 
 ####################################
 

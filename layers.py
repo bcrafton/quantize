@@ -62,11 +62,9 @@ class model:
     
     def collect(self, x):
         y = x
-        stats = {}
         for layer in self.layers:
-            y, stat = layer.collect(y)
-            stats.update(stat)
-        return y, stats
+            y = layer.collect(y)
+        return y
 
     def predict(self, x):
         y = x
@@ -116,32 +114,31 @@ class conv_block(layer):
     def __init__(self, f1, f2, p, weights=None):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
-        
+
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        
+
         if weights:
             print (weights[self.layer_id].keys())
             f     = weights[self.layer_id]['f']
-            g     = weights[self.layer_id]['g']
             b     = weights[self.layer_id]['b']
-            scale = weights[self.layer_id]['scale']
-            std   = weights[self.layer_id]['std']
-            mean  = weights[self.layer_id]['mean']
-
-            f = f * g / std
-            b = b - (g / std) * mean
+            q     = weights[self.layer_id]['q']
 
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.q = scale
+            self.q = q
             
         else:
             self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
             self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
             self.q = None
+
+            self.total = 0
+            self.std = np.zeros(shape=self.f2)
+            self.mean = np.zeros(shape=self.f2)
+            self.scale = 0.
 
     def train(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
@@ -167,7 +164,7 @@ class conv_block(layer):
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
-        # qf = quantize_and_dequantize(fold_f, -128, 127)
+
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
@@ -177,26 +174,35 @@ class conv_block(layer):
 
         qpool, spool = quantize(pool, -128, 127)
 
-        # qpool = tf.Print(qpool, [tf.reduce_max(pool), tf.reduce_mean(qpool)], message='', summarize=1000)
-        # qpool = tf.Print(qpool, [self.layer_id, spool, tf.math.reduce_std(qf), tf.math.reduce_std(qb)], message='', summarize=1000)
-        # return qpool, [spool, std, mean]
+        n, h, w, c = np.shape(x)
+        self.std += std.numpy()
+        self.mean += mean.numpy()
+        self.scale += spool.numpy()
+        self.total += 1
 
-        return qpool, {self.layer_id: {'std': std, 'mean': mean, 'scale': spool}}
+        return qpool
 
     def predict(self, x):
-        qf, sf = quantize(self.f, -128, 127)
-        qb = quantize_predict(self.b, sf, -2**24, 2**24-1)
-
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
+        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
         relu = tf.nn.relu(conv)
         pool = tf.nn.avg_pool(relu, ksize=[1,self.p,self.p,1], strides=[1,self.p,self.p,1], padding='SAME')
-        
         qpool = quantize_predict(pool, self.q, -128, 127)
         return qpool
         
     def get_weights(self):
         weights_dict = {}
-        weights_dict[self.layer_id] = {'f': self.f, 'g': self.g, 'b': self.b}
+
+        std = self.std / self.total
+        mean = self.mean / self.total
+        q = self.scale / self.total
+
+        fold_f = (self.g * self.f) / std
+        qf, sf = quantize(fold_f, -128, 127)
+
+        fold_b = self.b - ((self.g * mean) / std)
+        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1) # can probably leave b as a float.
+
+        weights_dict[self.layer_id] = {'f': qf, 'b': qb, 'q': q}
         return weights_dict
 
     def get_params(self):
@@ -214,7 +220,7 @@ class dense_block(layer):
 
         if weights:
             print (weights[self.layer_id].keys())
-            w, b, q = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['scale']
+            w, b, q = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['q']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
             self.q = q
@@ -222,6 +228,9 @@ class dense_block(layer):
             self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
             self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
             self.q = None
+
+            self.total = 0
+            self.scale = 0.
         
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
@@ -238,25 +247,24 @@ class dense_block(layer):
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
         qfc, sfc = quantize(fc, -128, 127)
-        # return qfc, [sfc]
-        return qfc, {self.layer_id: {'scale': sfc}}
+
+        self.scale += sfc.numpy()
+        self.total += 1
+
+        return qfc
 
     def predict(self, x):
-        qw = self.w
-        qb = self.b
-        
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + qb
+        fc = tf.matmul(x, self.w) + self.b
         qfc = quantize_predict(fc, self.q, -128, 127)
         return qfc
         
     def get_weights(self):
-        qw, _ = quantize(self.w, -128, 127)
-        qb, _ = quantize(self.b, -128, 127)
-    
-        weights_dict = {}
-        weights_dict[self.layer_id] = {'w': qw, 'b': qb}
-        
+        weights_dict = {}        
+        qw, sw = quantize(self.w, -128, 127)
+        qb = quantize_predict(self.b, sw, -2**24, 2**24-1) # can probably leave b as a float.
+        q = self.scale / self.total
+        weights_dict[self.layer_id] = {'w': qw, 'b': qb, 'q': q}
         return weights_dict
         
     def get_params(self):
@@ -286,8 +294,7 @@ class avg_pool(layer):
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        # return pool, [spool]
-        return pool, {}
+        return pool
 
     def predict(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
@@ -326,8 +333,7 @@ class max_pool(layer):
     def collect(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        # return pool, [spool]
-        return pool, {}
+        return pool
 
     def predict(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
