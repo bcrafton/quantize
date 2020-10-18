@@ -60,7 +60,7 @@ move collect inside, use .numpy() to collect {scale, std, mean}
 -----
 -----
 
-
+want to get rid of this pool thing inside of the layer.
 
 
 

@@ -80,15 +80,16 @@ def collect(model, x, y):
 ####################################
 
 batch_size = 50
-total_correct = 0
-for batch in range(0, len(x_train), batch_size):
-    xs = x_train[batch:batch+batch_size].astype(np.float32)
-    ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int64)
-    loss, correct, grad = gradients(model, xs, ys)
-    optimizer.apply_gradients(zip(grad, params))
-    total_correct += correct
-    
-print (total_correct / len(x_train) * 100)
+for _ in range(5):
+    total_correct = 0
+    for batch in range(0, len(x_train), batch_size):
+        xs = x_train[batch:batch+batch_size].astype(np.float32)
+        ys = y_train[batch:batch+batch_size].reshape(-1).astype(np.int64)
+        loss, correct, grad = gradients(model, xs, ys)
+        optimizer.apply_gradients(zip(grad, params))
+        total_correct += correct
+
+    print (total_correct / len(x_train) * 100)
 
 ####################################
 
