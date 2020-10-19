@@ -200,7 +200,7 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1) # can probably leave b as a float.
 
-        weights_dict[self.layer_id] = {'f': qf, 'b': qb, 'q': q}
+        weights_dict[self.layer_id] = {'f': qf.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
 
     def get_params(self):
@@ -264,7 +264,7 @@ class dense_block(layer):
         qw, sw = quantize(self.w, -128, 127)
         qb = quantize_predict(self.b, sw, -2**24, 2**24-1) # can probably leave b as a float.
         q = self.scale / self.total
-        weights_dict[self.layer_id] = {'w': qw, 'b': qb, 'q': q}
+        weights_dict[self.layer_id] = {'w': qw.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
         
     def get_params(self):
