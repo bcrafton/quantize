@@ -112,15 +112,16 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, weights=None, relu=True, train=True):
+    def __init__(self, shape, p, weights=None, relu=True, train=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
         self.weight_id = layer.weight_id
         layer.weight_id += 1
 
-        self.f1 = f1
-        self.f2 = f2
+        self.k, _, self.f1, self.f2 = shape
+        self.pad = self.k // 2
+        self.p = p
 
         self.relu_flag = relu
         self.train_flag = train
@@ -150,17 +151,16 @@ class conv_block(layer):
             self.q = q
 
     def train(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
         qf = quantize_and_dequantize(fold_f, -128, 127)
-        # qb = quantize_and_dequantize(fold_b, -128, 127) 
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
-
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
@@ -168,7 +168,8 @@ class conv_block(layer):
         return qout
     
     def collect(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
@@ -178,8 +179,7 @@ class conv_block(layer):
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
-        conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
-
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
@@ -194,7 +194,8 @@ class conv_block(layer):
         return qout, sf * sout
 
     def predict(self, x):
-        conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
 
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
