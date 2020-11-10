@@ -111,13 +111,14 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, weights=None, train=True):
+    def __init__(self, f1, f2, weights=None, relu=True, train=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
         self.f1 = f1
         self.f2 = f2
 
+        self.relu_flag = relu
         self.train_flag = train
 
         if self.train_flag:
@@ -155,9 +156,11 @@ class conv_block(layer):
         # qb = quantize_and_dequantize(fold_b, -128, 127) 
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
-        relu = tf.nn.relu(conv)
 
-        qout = quantize_and_dequantize(relu, -128, 127)
+        if self.relu: out = tf.nn.relu(conv)
+        else:         out = conv
+
+        qout = quantize_and_dequantize(out, -128, 127)
         return qout
     
     def collect(self, x):
@@ -172,9 +175,11 @@ class conv_block(layer):
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
-        relu = tf.nn.relu(conv)
 
-        qout, sout = quantize(relu, -128, 127)
+        if self.relu: out = tf.nn.relu(conv)
+        else:         out = conv
+
+        qout, sout = quantize(out, -128, 127)
 
         n, h, w, c = np.shape(x)
         self.std += std.numpy()
@@ -186,8 +191,11 @@ class conv_block(layer):
 
     def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
-        relu = tf.nn.relu(conv)
-        qout = quantize_predict(relu, self.q, -128, 127)
+
+        if self.relu: out = tf.nn.relu(conv)
+        else:         out = conv
+
+        qout = quantize_predict(out, self.q, -128, 127)
         return qout
         
     def get_weights(self):
@@ -242,7 +250,7 @@ class dense_block(layer):
 
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
-        
+
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + self.b
         qfc = quantize_and_dequantize(fc, -128, 127)
