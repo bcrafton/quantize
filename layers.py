@@ -92,7 +92,8 @@ class model:
 
 class layer:
     layer_id = 0
-    
+    weight_id = 0
+
     def __init__(self):
         assert(False)
         
@@ -115,6 +116,9 @@ class conv_block(layer):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
+        self.weight_id = layer.weight_id
+        layer.weight_id += 1
+
         self.f1 = f1
         self.f2 = f2
 
@@ -127,9 +131,9 @@ class conv_block(layer):
             self.mean = np.zeros(shape=self.f2)
             self.scale = 0.
             if weights:
-                f = weights[self.layer_id]['f']
-                b = weights[self.layer_id]['b']
-                g = weights[self.layer_id]['g']
+                f = weights[self.weight_id]['f']
+                b = weights[self.weight_id]['b']
+                g = weights[self.weight_id]['g']
                 self.f = tf.Variable(f, dtype=tf.float32)
                 self.b = tf.Variable(b, dtype=tf.float32)
                 self.g = tf.Variable(g, dtype=tf.float32)
@@ -157,8 +161,8 @@ class conv_block(layer):
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + fold_b
 
-        if self.relu: out = tf.nn.relu(conv)
-        else:         out = conv
+        if self.relu_flag: out = tf.nn.relu(conv)
+        else:              out = conv
 
         qout = quantize_and_dequantize(out, -128, 127)
         return qout
@@ -176,8 +180,8 @@ class conv_block(layer):
         
         conv = tf.nn.conv2d(x, qf, [1,1,1,1], 'SAME') + qb
 
-        if self.relu: out = tf.nn.relu(conv)
-        else:         out = conv
+        if self.relu_flag: out = tf.nn.relu(conv)
+        else:              out = conv
 
         qout, sout = quantize(out, -128, 127)
 
@@ -192,8 +196,8 @@ class conv_block(layer):
     def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
 
-        if self.relu: out = tf.nn.relu(conv)
-        else:         out = conv
+        if self.relu_flag: out = tf.nn.relu(conv)
+        else:              out = conv
 
         qout = quantize_predict(out, self.q, -128, 127)
         return qout
@@ -223,7 +227,10 @@ class dense_block(layer):
     def __init__(self, isize, osize, weights=None, train=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
-    
+
+        self.weight_id = layer.weight_id
+        layer.weight_id += 1
+
         self.isize = isize
         self.osize = osize
 
@@ -233,8 +240,8 @@ class dense_block(layer):
             self.total = 0
             self.scale = 0.
             if weights:
-                w = weights[self.layer_id]['w']
-                b = weights[self.layer_id]['b']
+                w = weights[self.weight_id]['w']
+                b = weights[self.weight_id]['b']
                 self.w = tf.Variable(w, dtype=tf.float32)
                 self.b = tf.Variable(b, dtype=tf.float32)
             else:
@@ -368,14 +375,16 @@ class max_pool(layer):
 #############
 
 class res_block1(layer):
-    def __init__(self, f1, f2, p, weights=None):
+    def __init__(self, f1, f2, p, weights=None, train=True):
         
         self.f1 = f1
         self.f2 = f2
         self.p = p
 
-        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights)
-        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False)
+        self.train_flag = train
+
+        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights, relu=True,  train=train)
+        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train)
 
         self.layer_id = layer.layer_id
         layer.layer_id += 1
@@ -419,15 +428,17 @@ class res_block1(layer):
 #############
 
 class res_block2(layer):
-    def __init__(self, f1, f2, p, weights=None):
+    def __init__(self, f1, f2, p, weights=None, train=True):
 
         self.f1 = f1
         self.f2 = f2
         self.p = p
-        
-        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights)
-        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False)
-        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False)
+
+        self.train_flag = train
+
+        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights, relu=True,  train=train)
+        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train)
+        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False, train=train)
         
         self.layer_id = layer.layer_id
         layer.layer_id += 1

@@ -58,14 +58,11 @@ params = model.get_params()
 
 ####################################
 
-# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
 optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1.)
-# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-1, beta_1=0.9, beta_2=0.999, epsilon=1.)
-# optimizer = tf.keras.optimizers.SGD(learning_rate=1e-3, momentum=0.9)
 
 def gradients(model, x, y):
     with tf.GradientTape() as tape:
-        pred_logits = model.train(x, training=True)
+        pred_logits = model.train(x)
         pred_label = tf.argmax(pred_logits, axis=1)
         loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=pred_logits))
         correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
@@ -74,21 +71,21 @@ def gradients(model, x, y):
     return loss, correct, grad
 
 ####################################
-
+'''
 def predict(model, x, y):
     pred_logits = model.train(x)
     pred_label = tf.argmax(pred_logits, axis=1)
     correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     return correct
-
+'''
 ####################################
-
+'''
 def collect(model, x, y):
     pred_logits, stats = model.collect(x)
     pred_label = tf.argmax(pred_logits, axis=1)
     correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     return correct, stats
-
+'''
 ####################################
 
 def run_train():
@@ -97,7 +94,7 @@ def run_train():
     total = 1000000
     total_correct = 0
     total_loss = 0
-    batch_size = 50
+    batch_size = 32
 
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
     start = time.time()
@@ -125,18 +122,7 @@ def run_train():
     np.save('trained_weights', trained_weights)
 
 ####################################
-
-def accumulate_stats(sum_stats, stats, scale):
-    if not sum_stats.keys():
-        for layer in stats.keys():
-            sum_stats[layer] = {}
-            for stat in stats[layer].keys():
-                sum_stats[layer][stat] = scale * stats[layer][stat]
-    else:
-        for layer in stats.keys():
-            for stat in stats[layer].keys():
-                sum_stats[layer][stat] += scale * stats[layer][stat]
-                
+'''
 def run_collect():
 
     # total = 1281150
@@ -148,19 +134,12 @@ def run_collect():
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
     start = time.time()
 
-    sum_stats = {}
-
     for batch in range(0, total, batch_size):
         while load.empty(): pass # print ('empty')
         
         x, y = load.pop()
-        
-        # loss, correct, grad = gradients(model, x, y)
-        # optimizer.apply_gradients(zip(grad, params))
-        # total_loss += loss.numpy()
-        
-        correct, stats = collect(model, x, y)
-        accumulate_stats(sum_stats, stats, batch_size / total)
+
+        correct = collect(model, x, y)
 
         total_correct += correct.numpy()
         acc = round(total_correct / (batch + batch_size), 3)
@@ -171,10 +150,9 @@ def run_collect():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
-    np.save('bn_stats', sum_stats)
-
+'''
 ####################################
-
+'''
 def run_val():
 
     total = 50000
@@ -203,16 +181,16 @@ def run_val():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
-
+'''
 ####################################
 
 train_flag = True
 
 if train_flag:
     run_train()
-    run_collect()
+    pass # run_collect()
 else:
-    run_val()
+    pass # run_val()
 
 ####################################
 
