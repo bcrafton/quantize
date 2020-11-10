@@ -179,7 +179,7 @@ class conv_block(layer):
         self.scale += sout.numpy()
         self.total += 1
 
-        return qout
+        return qout, sf * sout
 
     def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') + self.b
@@ -251,7 +251,7 @@ class dense_block(layer):
         self.scale += sfc.numpy()
         self.total += 1
 
-        return qfc
+        return qfc, sfc
 
     def predict(self, x):
         x = tf.reshape(x, (-1, self.isize))
@@ -294,7 +294,7 @@ class avg_pool(layer):
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool
+        return pool, 1
 
     def predict(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
@@ -333,7 +333,7 @@ class max_pool(layer):
     def collect(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool
+        return pool, 1
 
     def predict(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
@@ -349,7 +349,114 @@ class max_pool(layer):
         return []
 
 
+#############
 
+class res_block1(layer):
+    def __init__(self, f1, f2, p, weights=None):
+        
+        self.f1 = f1
+        self.f2 = f2
+        self.p = p
+
+        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights)
+        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False)
+
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+
+        self.total = 0
+        self.scale = 0.
+
+    def train(self, x):
+        y1 = self.conv1.train(x)
+        y2 = self.conv2.train(y1)
+        y3 = tf.nn.relu(x + y2)
+        qout = quantize_and_dequantize(y3, -128, 127)
+        return qout
+
+    def collect(self, x):
+        y1, s1 = self.conv1.collect(x)
+        y2, s2 = self.conv2.collect(y1)
+        y3 = tf.nn.relu(x + s2 * y2)
+        out, sout = quantize(y3, -128, 127)
+
+        self.scale += sout.numpy()
+        self.total += 1
+
+        return out, sout
+
+    def get_weights(self):
+        weights_dict = {}
+        weights1 = self.conv1.get_weights()
+        weights2 = self.conv2.get_weights()
+        
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
+        return weights_dict
+        
+    def get_params(self):
+        params = []
+        params.extend(self.conv1.get_params())
+        params.extend(self.conv2.get_params())
+        return params
+
+#############
+
+class res_block2(layer):
+    def __init__(self, f1, f2, p, weights=None):
+
+        self.f1 = f1
+        self.f2 = f2
+        self.p = p
+        
+        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights)
+        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False)
+        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False)
+        
+        self.layer_id = layer.layer_id
+        layer.layer_id += 1
+
+        self.total = 0
+        self.scale = 0.
+
+    def train(self, x):
+        y1 = self.conv1.train(x)
+        y2 = self.conv2.train(y1)
+        y3 = self.conv3.train(x)
+        y4 = tf.nn.relu(y2 + y3)
+        return y4
+
+    def collect(self, x):
+        y1, s1 = self.conv1.collect(x)
+        y2, s2 = self.conv2.collect(y1)
+        y3, s3 = self.conv3.collect(x)
+        y4 = tf.nn.relu(s1 * s2 * y2 + s3 * y3)
+        out, sout = quantize(y4, -128, 127)
+
+        self.scale += sout.numpy()
+        self.total += 1
+
+        return out, sout
+
+    def get_weights(self):
+        weights_dict = {}
+        weights1 = self.conv1.get_weights()
+        weights2 = self.conv2.get_weights()
+        weights3 = self.conv3.get_weights()
+        
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
+        weights_dict.update(weights3)
+        return weights_dict
+
+    def get_params(self):
+        params = []
+        params.extend(self.conv1.get_params())
+        params.extend(self.conv2.get_params())
+        params.extend(self.conv3.get_params())
+        return params
+
+#############
 
 
 
