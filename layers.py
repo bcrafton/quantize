@@ -111,35 +111,38 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, f1, f2, weights=None):
+    def __init__(self, f1, f2, weights=None, train=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
         self.f1 = f1
         self.f2 = f2
 
-        if weights:
-            print (weights[self.layer_id].keys())
-            f     = weights[self.layer_id]['f']
-            b     = weights[self.layer_id]['b']
-            q     = weights[self.layer_id]['q']
-            assert (np.all(f % 1) == 0)
-            assert (np.all(b % 1) == 0)
+        self.train_flag = train
 
-            self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
-            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.q = q
-            
-        else:
-            self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-            self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
-            self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
-            self.q = None
-
+        if self.train_flag:
             self.total = 0
             self.std = np.zeros(shape=self.f2)
             self.mean = np.zeros(shape=self.f2)
             self.scale = 0.
+            if weights:
+                f = weights[self.layer_id]['f']
+                b = weights[self.layer_id]['b']
+                g = weights[self.layer_id]['g']
+                self.f = tf.Variable(f, dtype=tf.float32)
+                self.b = tf.Variable(b, dtype=tf.float32)
+                self.g = tf.Variable(g, dtype=tf.float32)
+            else:
+                self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
+                self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
+                self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
+        else:
+            f = weights[self.layer_id]['f']
+            b = weights[self.layer_id]['b']
+            q = weights[self.layer_id]['q']
+            self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
+            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+            self.q = q
 
     def train(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,1,1,1], 'SAME') # there is no bias when we have bn.
@@ -209,29 +212,34 @@ class conv_block(layer):
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize, weights=None):
+    def __init__(self, isize, osize, weights=None, train=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
     
         self.isize = isize
         self.osize = osize
 
-        if weights:
-            print (weights[self.layer_id].keys())
-            w, b, q = weights[self.layer_id]['w'], weights[self.layer_id]['b'], weights[self.layer_id]['q']
-            assert (np.all(w % 1) == 0)
-            assert (np.all(b % 1) == 0)
-            self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
-            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
-            self.q = q
-        else:
-            self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
-            self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
-            self.q = None
+        self.train_flag = train
 
+        if self.train_flag:
             self.total = 0
             self.scale = 0.
-        
+            if weights:
+                w = weights[self.layer_id]['w']
+                b = weights[self.layer_id]['b']
+                self.w = tf.Variable(w, dtype=tf.float32)
+                self.b = tf.Variable(b, dtype=tf.float32)
+            else:
+                self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
+                self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+        else:
+            w = weights[self.layer_id]['w']
+            b = weights[self.layer_id]['b']
+            q = weights[self.layer_id]['q']
+            self.w = tf.Variable(f, dtype=tf.float32, trainable=False)
+            self.b = tf.Variable(b, dtype=tf.float32, trainable=False)
+            self.q = q
+
     def train(self, x):
         qw = quantize_and_dequantize(self.w, -128, 127)
         
