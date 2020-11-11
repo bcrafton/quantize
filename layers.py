@@ -202,11 +202,16 @@ class conv_block(layer):
     def quantize(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+
         # mean = tf.reduce_mean(conv, axis=[0,1,2])
         # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         # std = tf.sqrt(var + 1e-3)
-        fold_f = (self.g * self.f) / self.std
-        fold_b = self.b - ((self.g * self.mean) / self.std)
+
+        std = self.std / self.total
+        mean = self.mean / self.total
+
+        fold_f = (self.g * self.f) / std
+        fold_b = self.b - ((self.g * mean) / std)
 
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
@@ -217,8 +222,8 @@ class conv_block(layer):
 
         qout, sout = quantize(out, -128, 127)
 
-        self.scale += sout.numpy()
-        self.total += 1
+        # self.scale += sout.numpy()
+        # self.total += 1
 
         return qout, sf * sout
 

@@ -62,8 +62,12 @@ move collect inside, use .numpy() to collect {scale, std, mean}
 
 want to get rid of this pool thing inside of the layer.
 
+-----
 
+issue is clear -- collect / quantize do (quantize and dequantize vs quantize) so of course the values are different for all but first layer.
 
+does it matter ? 
+i think so
 
 
 
