@@ -62,7 +62,13 @@ class model:
     def collect(self, x):
         y = x
         for layer in self.layers:
-            y, _ = layer.collect(y)
+            y = layer.collect(y)
+        return y
+
+    def quantize(self, x):
+        y = x
+        for layer in self.layers:
+            y, _ = layer.quantize(y)
         return y
 
     def predict(self, x):
@@ -100,6 +106,9 @@ class layer:
         assert(False)
     
     def collect(self, x):
+        assert(False)
+
+    def quantize(self, x):
         assert(False)
 
     def predict(self, x):
@@ -159,7 +168,7 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
 
         qf = quantize_and_dequantize(fold_f, -128, 127)
-        
+
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
@@ -176,6 +185,29 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
+        qf = quantize_and_dequantize(fold_f, -128, 127)
+
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
+        if self.relu_flag: out = tf.nn.relu(conv)
+        else:              out = conv
+
+        qout = quantize_and_dequantize(out, -128, 127)
+
+        self.std += std.numpy()
+        self.mean += mean.numpy()
+        self.total += 1
+
+        return qout
+
+    def quantize(self, x):
+        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+        # mean = tf.reduce_mean(conv, axis=[0,1,2])
+        # _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
+        # std = tf.sqrt(var + 1e-3)
+        fold_f = (self.g * self.f) / self.std
+        fold_b = self.b - ((self.g * self.mean) / self.std)
+
         qf, sf = quantize(fold_f, -128, 127)
         qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
         
@@ -185,9 +217,6 @@ class conv_block(layer):
 
         qout, sout = quantize(out, -128, 127)
 
-        n, h, w, c = np.shape(x)
-        self.std += std.numpy()
-        self.mean += mean.numpy()
         self.scale += sout.numpy()
         self.total += 1
 
@@ -265,6 +294,9 @@ class dense_block(layer):
         return qfc
     
     def collect(self, x):
+        return self.train(x)
+
+    def quantize(self, x):
         qw, sw = quantize(self.w, -128, 127)
         qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
         
@@ -309,6 +341,9 @@ class avg_pool(layer):
         return pool
     
     def collect(self, x):
+        return self.train(x)
+    
+    def quantize(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
         return pool, spool
@@ -337,8 +372,11 @@ class max_pool(layer):
     def train(self, x):        
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         return pool
-    
+
     def collect(self, x):
+        return self.train(x)
+
+    def quantize(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
         return pool, spool
@@ -353,7 +391,6 @@ class max_pool(layer):
 
     def get_params(self):
         return []
-
 
 #############
 
@@ -383,8 +420,15 @@ class res_block1(layer):
         return qout
 
     def collect(self, x):
-        y1, s1 = self.conv1.collect(x)
-        y2, s2 = self.conv2.collect(y1)
+        y1 = self.conv1.collect(x)
+        y2 = self.conv2.collect(y1)
+        y3 = tf.nn.relu(x + y2)
+        qout = quantize_and_dequantize(y3, -128, 127)
+        return qout
+
+    def quantize(self, x):
+        y1, s1 = self.conv1.quantize(x)
+        y2, s2 = self.conv2.quantize(y1)
         y3 = tf.nn.relu(x + s1*s2*y2)
         out, sout = quantize(y3, -128, 127)
 
@@ -437,9 +481,16 @@ class res_block2(layer):
         return y4
 
     def collect(self, x):
-        y1, s1 = self.conv1.collect(x)
-        y2, s2 = self.conv2.collect(y1)
-        y3, s3 = self.conv3.collect(x)
+        y1 = self.conv1.collect(x)
+        y2 = self.conv2.collect(y1)
+        y3 = self.conv3.collect(x)
+        y4 = tf.nn.relu(y2 + y3)
+        return y4
+
+    def quantize(self, x):
+        y1, s1 = self.conv1.quantize(x)
+        y2, s2 = self.conv2.quantize(y1)
+        y3, s3 = self.conv3.quantize(x)
         y4 = tf.nn.relu(s1*s2*y2 + s3*y3)
         out, sout = quantize(y4, -128, 127)
 

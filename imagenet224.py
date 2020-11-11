@@ -88,6 +88,14 @@ def collect(model, x, y):
 
 ####################################
 
+def quantize(model, x, y):
+    pred_logits = model.quantize(x)
+    pred_label = tf.argmax(pred_logits, axis=1)
+    correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
+    return correct
+
+####################################
+
 def run_train():
 
     # total = 1281150
@@ -122,6 +130,36 @@ def run_train():
 
 ####################################
 
+def run_quantize():
+
+    # total = 1281150
+    total = 50000
+    total_correct = 0
+    total_loss = 0
+    batch_size = 50
+
+    load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
+    start = time.time()
+
+    for batch in range(0, total, batch_size):
+        while load.empty(): pass # print ('empty')
+
+        x, y = load.pop()
+
+        correct = quantize(model, x, y)
+
+        total_correct += correct.numpy()
+        acc = round(total_correct / (batch + batch_size), 3)
+        avg_loss = total_loss / (batch + batch_size)
+
+        if (batch + batch_size) % (batch_size * 100) == 0:
+            img_per_sec = (batch + batch_size) / (time.time() - start)
+            print (batch + batch_size, img_per_sec, acc, avg_loss)
+
+    load.join()
+
+####################################
+
 def run_collect():
 
     # total = 1281150
@@ -135,7 +173,7 @@ def run_collect():
 
     for batch in range(0, total, batch_size):
         while load.empty(): pass # print ('empty')
-        
+
         x, y = load.pop()
 
         correct = collect(model, x, y)
@@ -143,7 +181,7 @@ def run_collect():
         total_correct += correct.numpy()
         acc = round(total_correct / (batch + batch_size), 3)
         avg_loss = total_loss / (batch + batch_size)
-        
+
         if (batch + batch_size) % (batch_size * 100) == 0:
             img_per_sec = (batch + batch_size) / (time.time() - start)
             print (batch + batch_size, img_per_sec, acc, avg_loss)
@@ -186,8 +224,9 @@ def run_val():
 train_flag = True
 
 if train_flag:
-    run_train()
+    # run_train()
     run_collect()
+    run_quantize()
 else:
     pass # run_val()
 
