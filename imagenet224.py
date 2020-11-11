@@ -14,7 +14,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[2]
+gpu = gpus[3]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -29,7 +29,8 @@ def quantize_np(x, low, high):
 
 ####################################
 
-train_flag = True
+train_flag = False
+num_example = 10000
 
 if train_flag:
     weights = np.load('resnet18.npy', allow_pickle=True).item()
@@ -97,7 +98,7 @@ def collect(model, x, y):
 def run_train():
 
     # total = 1281150
-    total = 100000
+    total = num_example
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -131,7 +132,7 @@ def run_train():
 def run_collect():
 
     # total = 1281150
-    total = 100000
+    total = num_example
     total_correct = 0
     total_loss = 0
     batch_size = 50

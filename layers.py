@@ -50,7 +50,7 @@ def quantize(x, low, high):
     
 def quantize_scale(x, scale, low, high):
     x = x / scale
-    x = tf.floor(x)
+    x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     return x
 
@@ -118,7 +118,7 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, shape, p, weights=None, relu=True, train=True):
+    def __init__(self, shape, p, weights=None, relu=True, train=True, quantize=True):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
@@ -131,6 +131,7 @@ class conv_block(layer):
 
         self.relu_flag = relu
         self.train_flag = train
+        self.quantize_flag = quantize
 
         if self.train_flag:
             self.total = 0
@@ -172,7 +173,9 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        qout, _ = quantize_and_dequantize(out, -128, 127)
+        if self.quantize_flag: qout, _ = quantize_and_dequantize(out, -128, 127)
+        else:                  qout = out
+
         return qout
     
     def collect(self, x):
@@ -191,15 +194,17 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        qout, sout = quantize(out, -128, 127)
-
-        n, h, w, c = np.shape(x)
         self.std += std.numpy()
         self.mean += mean.numpy()
-        self.scale += sout.numpy()
         self.total += 1
 
-        return qout, sf * sout
+        if self.quantize_flag:
+            qout, sout = quantize(out, -128, 127)
+            self.scale += sout.numpy()
+        else:
+            qout = out
+
+        return qout, sf
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
@@ -208,7 +213,8 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        qout = quantize_scale(out, self.q, -128, 127)
+        if self.quantize_flag: qout = quantize_scale(out, self.q, -128, 127)
+        else:                  qout = out
         return qout
         
     def get_weights(self):
@@ -442,8 +448,8 @@ class res_block2(layer):
         self.train_flag = train
 
         self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights, relu=True,  train=train)
-        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train)
-        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False, train=train)
+        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train, quantize=False)
+        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False, train=train, quantize=False)
         
         self.layer_id = layer.layer_id
         layer.layer_id += 1
@@ -470,7 +476,7 @@ class res_block2(layer):
         y1, s1 = self.conv1.collect(x)
         y2, s2 = self.conv2.collect(y1)
         y3, s3 = self.conv3.collect(x)
-        y4 = tf.nn.relu(s2*y2 + s3*y3)
+        y4 = tf.nn.relu(s2 * y2 + s3 * y3)
         out, sout = quantize(y4, -128, 127)
 
         self.q_sum += sout.numpy()
