@@ -32,6 +32,13 @@ def quantize_and_dequantize(x, low, high):
     x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     x = x * scale
+    return x, scale
+
+def quantize_and_dequantize_scale(x, scale, low, high):
+    x = x / scale
+    x = round_no_grad(x)
+    x = tf.clip_by_value(x, low, high)
+    x = x * scale
     return x
 
 def quantize(x, low, high):
@@ -41,7 +48,7 @@ def quantize(x, low, high):
     x = tf.clip_by_value(x, low, high)
     return x, scale
     
-def quantize_predict(x, scale, low, high):
+def quantize_scale(x, scale, low, high):
     x = x / scale
     x = tf.floor(x)
     x = tf.clip_by_value(x, low, high)
@@ -158,13 +165,14 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
-        qf = quantize_and_dequantize(fold_f, -128, 127)
-        
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
+        qf, sf = quantize_and_dequantize(fold_f, -128, 127)
+        qb  = quantize_and_dequantize_scale(fold_b, sf, -2**24, 2**24-1)
+
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        qout = quantize_and_dequantize(out, -128, 127)
+        qout, _ = quantize_and_dequantize(out, -128, 127)
         return qout
     
     def collect(self, x):
@@ -177,7 +185,7 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
 
         qf, sf = quantize(fold_f, -128, 127)
-        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1)
+        qb = quantize_scale(fold_b, sf, -2**24, 2**24-1)
         
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -200,7 +208,7 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        qout = quantize_predict(out, self.q, -128, 127)
+        qout = quantize_scale(out, self.q, -128, 127)
         return qout
         
     def get_weights(self):
@@ -214,7 +222,7 @@ class conv_block(layer):
         qf, sf = quantize(fold_f, -128, 127)
 
         fold_b = self.b - ((self.g * mean) / std)
-        qb = quantize_predict(fold_b, sf, -2**24, 2**24-1) # can probably leave b as a float.
+        qb = quantize_scale(fold_b, sf, -2**24, 2**24-1) # can probably leave b as a float.
 
         weights_dict[self.layer_id] = {'f': qf.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
@@ -257,16 +265,17 @@ class dense_block(layer):
             self.q = q
 
     def train(self, x):
-        qw = quantize_and_dequantize(self.w, -128, 127)
+        qw, sw = quantize_and_dequantize(self.w, -128, 127)
+        qb = quantize_and_dequantize_scale(self.b, sw, -2**24, 2**24-1)
 
         x = tf.reshape(x, (-1, self.isize))
-        fc = tf.matmul(x, qw) + self.b
-        qfc = quantize_and_dequantize(fc, -128, 127)
+        fc = tf.matmul(x, qw) + qb
+        qfc, _ = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
     def collect(self, x):
         qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1)
+        qb = quantize_scale(self.b, sw, -2**24, 2**24-1)
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
@@ -280,13 +289,13 @@ class dense_block(layer):
     def predict(self, x):
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w) + self.b
-        qfc = quantize_predict(fc, self.q, -128, 127)
+        qfc = quantize_scale(fc, self.q, -128, 127)
         return qfc
         
     def get_weights(self):
         weights_dict = {}        
         qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_predict(self.b, sw, -2**24, 2**24-1) # can probably leave b as a float.
+        qb = quantize_scale(self.b, sw, -2**24, 2**24-1) # can probably leave b as a float.
         q = self.scale / self.total
         weights_dict[self.layer_id] = {'w': qw.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
@@ -379,13 +388,14 @@ class res_block1(layer):
         y1 = self.conv1.train(x)
         y2 = self.conv2.train(y1)
         y3 = tf.nn.relu(x + y2)
-        qout = quantize_and_dequantize(y3, -128, 127)
+        qout, _ = quantize_and_dequantize(y3, -128, 127)
+
         return qout
 
     def collect(self, x):
         y1, s1 = self.conv1.collect(x)
         y2, s2 = self.conv2.collect(y1)
-        y3 = tf.nn.relu(x + s1*s2*y2)
+        y3 = tf.nn.relu(x + y2)
         out, sout = quantize(y3, -128, 127)
 
         self.scale += sout.numpy()
@@ -434,13 +444,14 @@ class res_block2(layer):
         y2 = self.conv2.train(y1)
         y3 = self.conv3.train(x)
         y4 = tf.nn.relu(y2 + y3)
-        return y4
+        out, _ = quantize_and_dequantize(y4, -128, 127)
+        return out
 
     def collect(self, x):
         y1, s1 = self.conv1.collect(x)
         y2, s2 = self.conv2.collect(y1)
         y3, s3 = self.conv3.collect(x)
-        y4 = tf.nn.relu(s1*s2*y2 + s3*y3)
+        y4 = tf.nn.relu(s2*y2 + s3*y3)
         out, sout = quantize(y4, -128, 127)
 
         self.scale += sout.numpy()
