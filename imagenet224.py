@@ -29,32 +29,38 @@ def quantize_np(x, low, high):
 
 ####################################
 
-weights = np.load('resnet18.npy', allow_pickle=True).item()
+train_flag = True
+
+if train_flag:
+    weights = np.load('resnet18.npy', allow_pickle=True).item()
+else:
+    weights = np.load('trained_weights.npy', allow_pickle=True).item()
 
 ####################################
 
 model = model(layers=[
-conv_block((7,7,3,64), 2, weights=weights),
+conv_block((7,7,3,64), 2, weights=weights, train=train_flag),
 
 max_pool(2, 3),
 
-res_block1(64,   64, 1, weights=weights),
-res_block1(64,   64, 1, weights=weights),
+res_block1(64,   64, 1, weights=weights, train=train_flag),
+res_block1(64,   64, 1, weights=weights, train=train_flag),
 
-res_block2(64,   128, 2, weights=weights),
-res_block1(128,  128, 1, weights=weights),
+res_block2(64,   128, 2, weights=weights, train=train_flag),
+res_block1(128,  128, 1, weights=weights, train=train_flag),
 
-res_block2(128,  256, 2, weights=weights),
-res_block1(256,  256, 1, weights=weights),
+res_block2(128,  256, 2, weights=weights, train=train_flag),
+res_block1(256,  256, 1, weights=weights, train=train_flag),
 
-res_block2(256,  512, 2, weights=weights),
-res_block1(512,  512, 1, weights=weights),
+res_block2(256,  512, 2, weights=weights, train=train_flag),
+res_block1(512,  512, 1, weights=weights, train=train_flag),
 
 avg_pool(7, 7),
-dense_block(512, 1000, weights=weights)
+dense_block(512, 1000, weights=weights, train=train_flag)
 ])
 
-params = model.get_params()
+if train_flag:
+    params = model.get_params()
 
 ####################################
 
@@ -71,13 +77,13 @@ def gradients(model, x, y):
     return loss, correct, grad
 
 ####################################
-'''
+
 def predict(model, x, y):
-    pred_logits = model.train(x)
+    pred_logits = model.predict(x)
     pred_label = tf.argmax(pred_logits, axis=1)
     correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
     return correct
-'''
+
 ####################################
 
 def collect(model, x, y):
@@ -91,7 +97,7 @@ def collect(model, x, y):
 def run_train():
 
     # total = 1281150
-    total = 50000
+    total = 100000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -125,7 +131,7 @@ def run_train():
 def run_collect():
 
     # total = 1281150
-    total = 50000
+    total = 100000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -137,7 +143,6 @@ def run_collect():
         while load.empty(): pass # print ('empty')
         
         x, y = load.pop()
-
         correct = collect(model, x, y)
 
         total_correct += correct.numpy()
@@ -149,9 +154,11 @@ def run_collect():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
+    trained_weights = model.get_weights()
+    np.save('trained_weights', trained_weights)
 
 ####################################
-'''
+
 def run_val():
 
     total = 50000
@@ -160,18 +167,15 @@ def run_val():
     batch_size = 50
 
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_val/', total // batch_size, batch_size, 8)
-
     start = time.time()
 
     for batch in range(0, total, batch_size):
         while load.empty(): pass # print ('empty')
         
         x, y = load.pop()
-
         correct = predict(model, x, y)
 
         total_correct += correct.numpy()
-        
         acc = round(total_correct / (batch + batch_size), 3)
         avg_loss = total_loss / (batch + batch_size)
         
@@ -180,16 +184,14 @@ def run_val():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
-'''
-####################################
 
-train_flag = True
+####################################
 
 if train_flag:
     run_train()
     run_collect()
 else:
-    pass # run_val()
+    run_val()
 
 ####################################
 
