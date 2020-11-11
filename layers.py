@@ -16,29 +16,28 @@ from bc_utils.init_tensor import init_matrix
 
 @tf.custom_gradient
 def floor_no_grad(x):
-
     def grad(dy):
         return dy
-    
     return tf.floor(x), grad
-    
+
+@tf.custom_gradient
+def round_no_grad(x):
+    def grad(dy):
+        return dy
+    return tf.round(x), grad
 
 def quantize_and_dequantize(x, low, high):
-    # g = tf.get_default_graph()
-    # with g.gradient_override_map({"Floor": "Identity"}):
     scale = tf.reduce_max(tf.abs(x)) / high
     x = x / scale
-    x = floor_no_grad(x)
+    x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     x = x * scale
     return x
 
 def quantize(x, low, high):
-    # g = tf.get_default_graph()
-    # with g.gradient_override_map({"Floor": "Identity"}):
     scale = tf.reduce_max(tf.abs(x)) / high
     x = x / scale
-    x = floor_no_grad(x)
+    x = round_no_grad(x)
     x = tf.clip_by_value(x, low, high)
     return x, scale
     
@@ -63,7 +62,7 @@ class model:
     def collect(self, x):
         y = x
         for layer in self.layers:
-            y = layer.collect(y)
+            y, _ = layer.collect(y)
         return y
 
     def predict(self, x):
@@ -158,6 +157,7 @@ class conv_block(layer):
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
+
         qf = quantize_and_dequantize(fold_f, -128, 127)
         
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + fold_b
@@ -292,7 +292,7 @@ class dense_block(layer):
         return weights_dict
         
     def get_params(self):
-        return [self.w]
+        return [self.w, self.b]
 
 #############
 
@@ -304,26 +304,17 @@ class avg_pool(layer):
         self.s = s
         self.p = p
         
-        if weights:
-            print ('pool', weights.keys())
-            self.q = weights['y']
-        else:
-            self.q = 1
-        
     def train(self, x):        
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = pool # quantize_and_dequantize(pool, -128, 127)
-        return qpool
+        return pool
     
     def collect(self, x):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool, 1
+        return pool, spool
 
     def predict(self, x):
-        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = pool # quantize_predict(pool, scale, -128, 127) # this only works because we use np.ceil(scales)
-        return qpool
+        assert (False)
         
     def get_weights(self):    
         weights_dict = {}
@@ -343,26 +334,17 @@ class max_pool(layer):
         self.s = s
         self.p = p
         
-        if weights:
-            print ('pool', weights.keys())
-            self.q = weights['y']
-        else:
-            self.q = 1
-        
     def train(self, x):        
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = pool 
-        return qpool
+        return pool
     
     def collect(self, x):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool, 1
+        return pool, spool
 
     def predict(self, x):
-        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool = pool 
-        return qpool
+        assert (False)
         
     def get_weights(self):    
         weights_dict = {}
@@ -403,7 +385,7 @@ class res_block1(layer):
     def collect(self, x):
         y1, s1 = self.conv1.collect(x)
         y2, s2 = self.conv2.collect(y1)
-        y3 = tf.nn.relu(x + s2 * y2)
+        y3 = tf.nn.relu(x + s1*s2*y2)
         out, sout = quantize(y3, -128, 127)
 
         self.scale += sout.numpy()
@@ -458,7 +440,7 @@ class res_block2(layer):
         y1, s1 = self.conv1.collect(x)
         y2, s2 = self.conv2.collect(y1)
         y3, s3 = self.conv3.collect(x)
-        y4 = tf.nn.relu(s1 * s2 * y2 + s3 * y3)
+        y4 = tf.nn.relu(s1*s2*y2 + s3*y3)
         out, sout = quantize(y4, -128, 127)
 
         self.scale += sout.numpy()

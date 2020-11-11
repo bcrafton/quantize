@@ -14,7 +14,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[0]
+gpu = gpus[1]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -79,22 +79,22 @@ def predict(model, x, y):
     return correct
 '''
 ####################################
-'''
+
 def collect(model, x, y):
-    pred_logits, stats = model.collect(x)
+    pred_logits = model.collect(x)
     pred_label = tf.argmax(pred_logits, axis=1)
     correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
-    return correct, stats
-'''
+    return correct
+
 ####################################
 
 def run_train():
 
     # total = 1281150
-    total = 1000000
+    total = 50000
     total_correct = 0
     total_loss = 0
-    batch_size = 32
+    batch_size = 50
 
     load = Loader('/home/bcrafton3/Data_HDD/keras_imagenet/keras_imagenet_train/', total // batch_size, batch_size, 8)
     start = time.time()
@@ -109,7 +109,6 @@ def run_train():
         total_loss += loss.numpy()
         
         total_correct += correct.numpy()
-        
         acc = round(total_correct / (batch + batch_size), 3)
         avg_loss = total_loss / (batch + batch_size)
         
@@ -118,15 +117,15 @@ def run_train():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
-    trained_weights = model.get_weights()
-    np.save('trained_weights', trained_weights)
+    # trained_weights = model.get_weights()
+    # np.save('trained_weights', trained_weights)
 
 ####################################
-'''
+
 def run_collect():
 
     # total = 1281150
-    total = 1000000
+    total = 50000
     total_correct = 0
     total_loss = 0
     batch_size = 50
@@ -150,7 +149,7 @@ def run_collect():
             print (batch + batch_size, img_per_sec, acc, avg_loss)
 
     load.join()
-'''
+
 ####################################
 '''
 def run_val():
@@ -188,7 +187,7 @@ train_flag = True
 
 if train_flag:
     run_train()
-    pass # run_collect()
+    run_collect()
 else:
     pass # run_val()
 
