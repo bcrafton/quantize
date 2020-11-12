@@ -51,12 +51,12 @@ def preprocess(filename):
     assert(w2 <= new_W)
     image = image[h1:h2, w1:w2, :]
     
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    image = image / 255
-    image = (image - mean) / std
+    # mean = np.array([0.485, 0.456, 0.406])
+    # std = np.array([0.229, 0.224, 0.225])
+    # image = image / 255
+    # image = (image - mean) / std
     
-    # image = image // 2
+    image = image // 2
     
     return image
 

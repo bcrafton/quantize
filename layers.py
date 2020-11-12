@@ -337,7 +337,7 @@ class avg_pool(layer):
     def collect(self, x, s):
         pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool, spool
+        return pool, s
 
     def predict(self, x, s):
         return self.collect(x, s)
@@ -367,7 +367,7 @@ class max_pool(layer):
     def collect(self, x, s):
         pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
         qpool, spool = quantize(pool, -128, 127)
-        return pool, spool
+        return pool, s
 
     def predict(self, x, s):
         return self.collect(x, s)
@@ -413,7 +413,7 @@ class res_block1(layer):
     def collect(self, x, s):
         y1, s1 = self.conv1.collect(x, s)
         y2, s2 = self.conv2.collect(y1, s1)
-        y3 = tf.nn.relu(x + y2)
+        y3 = tf.nn.relu(s*x + s2*y2)
         out, sout = quantize(y3, -128, 127)
 
         self.q_sum += sout.numpy()
@@ -424,7 +424,7 @@ class res_block1(layer):
     def predict(self, x, s):
         y1, s1 = self.conv1.predict(x, s)
         y2, s2 = self.conv2.predict(y1, s1)
-        y3 = tf.nn.relu(x + y2)
+        y3 = tf.nn.relu(s*x + s2*y2)
         out = quantize_scale(y3, self.q, -128, 127)
         return out, self.q
 

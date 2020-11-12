@@ -30,7 +30,7 @@ def quantize_np(x, low, high):
 ####################################
 
 train_flag = False
-num_example = 10000
+num_example = 100000
 
 if train_flag:
     weights = np.load('resnet18.npy', allow_pickle=True).item()
