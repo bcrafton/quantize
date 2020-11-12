@@ -146,9 +146,9 @@ class conv_block(layer):
                 self.b = tf.Variable(b, dtype=tf.float32)
                 self.g = tf.Variable(g, dtype=tf.float32)
             else:
-                self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32)
-                self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32)
-                self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32)
+                self.f = tf.Variable(init_filters(size=[3,3,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32, name='f_%d' % (self.layer_id))
+                self.b = tf.Variable(np.zeros(shape=(self.f2)), dtype=tf.float32, name='b_%d' % (self.layer_id))
+                self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, name='g_%d' % (self.layer_id))
         else:
             f = weights[self.layer_id]['f']
             b = weights[self.layer_id]['b']
@@ -167,7 +167,7 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
 
         qf, sf = quantize_and_dequantize(fold_f, -128, 127)
-        qb  = quantize_and_dequantize_scale(fold_b, sf, -2**24, 2**24-1)
+        qb = fold_b
 
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -188,7 +188,7 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
 
         qf, sf = quantize(fold_f, -128, 127)
-        qb = quantize_scale(fold_b, sf, -2**24, 2**24-1)
+        qb = fold_b / sf
         
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -260,8 +260,8 @@ class dense_block(layer):
                 self.w = tf.Variable(w, dtype=tf.float32)
                 self.b = tf.Variable(b, dtype=tf.float32)
             else:
-                self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32)
-                self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, trainable=False)
+                self.w = tf.Variable(init_matrix(size=(self.isize, self.osize), init='glorot_uniform'), dtype=tf.float32, name='w_%d' % (self.layer_id))
+                self.b = tf.Variable(np.zeros(shape=(self.osize)), dtype=tf.float32, name='b_%d' % (self.layer_id))
         else:
             w = weights[self.layer_id]['w']
             b = weights[self.layer_id]['b']
@@ -272,7 +272,7 @@ class dense_block(layer):
 
     def train(self, x):
         qw, sw = quantize_and_dequantize(self.w, -128, 127)
-        qb = quantize_and_dequantize_scale(self.b, sw, -2**24, 2**24-1)
+        qb = self.b
 
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
@@ -281,7 +281,7 @@ class dense_block(layer):
     
     def collect(self, x):
         qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_scale(self.b, sw, -2**24, 2**24-1)
+        qb = self.b
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw) + qb
@@ -299,9 +299,9 @@ class dense_block(layer):
         return qfc
         
     def get_weights(self):
-        weights_dict = {}        
+        weights_dict = {}
         qw, sw = quantize(self.w, -128, 127)
-        qb = quantize_scale(self.b, sw, -2**24, 2**24-1) # can probably leave b as a float.
+        qb = self.b
         q = self.scale / self.total
         weights_dict[self.layer_id] = {'w': qw.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
