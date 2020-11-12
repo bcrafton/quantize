@@ -30,6 +30,20 @@ x_test = quantize_np(x_test, 0, 127)
 
 ####################################
 
+# '''
+model = model(layers=[
+conv_block((3,3,3,64), 1),
+res_block1( 64,  64, 1),
+res_block2( 64, 128, 2),
+res_block2(128, 256, 2),
+res_block1(256, 256, 1),
+avg_pool(2, 2),
+avg_pool(4, 4),
+dense_block(256, 10)
+])
+# '''
+
+'''
 model = model(layers=[
 conv_block((3,3, 3,64), 1),
 conv_block((3,3,64,64), 1),
@@ -46,6 +60,7 @@ avg_pool(2, 2),
 avg_pool(4, 4),
 dense_block(256, 10)
 ])
+'''
 
 params = model.get_params()
 
@@ -83,7 +98,7 @@ def collect(model, x, y):
 ####################################
 
 batch_size = 50
-for _ in range(5):
+for _ in range(1):
     total_correct = 0
     for batch in range(0, len(x_train), batch_size):
         xs = x_train[batch:batch+batch_size].astype(np.float32)
