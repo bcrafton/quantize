@@ -5,9 +5,17 @@ from layers import *
 
 ####################################
 
+'''
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
 for device in gpu_devices:
+    # print (device)
     tf.config.experimental.set_memory_growth(device, True)
+'''
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+gpu = gpus[0]
+tf.config.experimental.set_visible_devices(gpu, 'GPU')
+tf.config.experimental.set_memory_growth(gpu, True)
 
 ####################################
 
