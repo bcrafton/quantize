@@ -13,7 +13,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[0]
+gpu = gpus[1]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -94,7 +94,7 @@ def collect(model, x, y):
 ####################################
 
 batch_size = 50
-for _ in range(10):
+for _ in range(1):
     total_correct = 0
     for batch in range(0, len(x_train), batch_size):
         xs = x_train[batch:batch+batch_size].astype(np.float32)

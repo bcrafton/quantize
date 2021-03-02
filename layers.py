@@ -68,16 +68,14 @@ class model:
     
     def collect(self, x):
         y = x
-        s = tf.constant(1.)
         for layer in self.layers:
-            y, s = layer.collect(y, s)
+            y = layer.collect(y)
         return y
 
     def predict(self, x):
         y = x
-        s = tf.constant(1.)
         for layer in self.layers:
-            y, s = layer.predict(y, s)
+            y = layer.predict(y)
         return y
         
     def get_weights(self):
@@ -139,7 +137,7 @@ class conv_block(layer):
             self.total = 0
             self.std = np.zeros(shape=self.f2)
             self.mean = np.zeros(shape=self.f2)
-            self.q_sum = 0.
+            self.qsum = 0.
             if weights:
                 f = weights[self.weight_id]['f']
                 b = weights[self.weight_id]['b']
@@ -183,7 +181,7 @@ class conv_block(layer):
     
     def collect(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        x_pad, sx = quantize(x_pad)
+        x_pad, sx = quantize(x_pad, -128, 127)
 
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
@@ -193,8 +191,9 @@ class conv_block(layer):
         fold_b = self.b - ((self.g * mean) / std)
 
         qf, sf = quantize(fold_f, -128, 127)
-        qb = fold_b / sf / sx
-        
+        qb = fold_b / sf # / sx
+        # sx not used here since batch norm
+
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
@@ -222,7 +221,7 @@ class conv_block(layer):
 
         std = self.std / self.total
         mean = self.mean / self.total
-        q = self.q_sum / self.total
+        q = self.qsum / self.total
 
         fold_f = (self.g * self.f) / std
         qf, sf = quantize(fold_f, -128, 127)
@@ -278,26 +277,25 @@ class dense_block(layer):
         qb = self.b
 
         fc = tf.matmul(qx, qw) + qb
-        qfc, _ = quantize_and_dequantize(fc, -128, 127)
-        return qfc
+        return fc
     
     def collect(self, x):
         qx, sx = quantize(x, -128, 127)
         qx = tf.reshape(qx, (-1, self.isize))
 
         qw, sw = quantize(self.w, -128, 127)
-        qb = self.b / sw / sx
+        qb = self.b / sw # / sx 
+        # sx should be used here since no batch norm
 
         fc = tf.matmul(qx, qw) + qb
-        qfc, sfc = quantize(fc, -128, 127)
 
         self.qsum += sx.numpy()
         self.total += 1
 
-        return qfc, sfc
+        return fc
 
     def predict(self, x):
-        qx, sx = quantize_scale(x, self.q, -128, 127)
+        qx = quantize_scale(x, self.q, -128, 127)
         qx = tf.reshape(qx, (-1, self.isize))
         fc = tf.matmul(qx, self.w) + self.b
         return fc
