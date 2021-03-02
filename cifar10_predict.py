@@ -34,7 +34,7 @@ x_test = quantize_np(x_test, 0, 127)
 
 ####################################
 
-# '''
+'''
 model = model(layers=[
 conv_block((3,3,3,64), 1, weights=weights, train=False),
 res_block1( 64,  64, 1, weights=weights, train=False),
@@ -45,9 +45,8 @@ avg_pool(2, 2),
 avg_pool(4, 4),
 dense_block(256, 10, weights=weights, train=False)
 ])
-# '''
-
 '''
+
 model = model(layers=[
 conv_block((3,3, 3,64), 1, weights=weights, train=False),
 conv_block((3,3,64,64), 1, weights=weights, train=False),
@@ -61,10 +60,12 @@ conv_block((3,3,128,256), 1, weights=weights, train=False),
 conv_block((3,3,256,256), 1, weights=weights, train=False),
 avg_pool(2, 2),
 
+conv_block((3,3,256,256), 1, weights=weights, train=False),
+conv_block((3,3,256,256), 1, weights=weights, train=False),
 avg_pool(4, 4),
+
 dense_block(256, 10, weights=weights, train=False)
 ])
-'''
 
 ####################################
 
