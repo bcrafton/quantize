@@ -134,7 +134,7 @@ class conv_block(layer):
         self.quantize_flag = quantize
 
         if self.train_flag:
-            self.total = 0
+            self.total = 0.
             self.std = np.zeros(shape=self.f2)
             self.mean = np.zeros(shape=self.f2)
             self.qsum = 0.
@@ -203,7 +203,7 @@ class conv_block(layer):
         self.total += 1
         self.qsum += sx.numpy()
 
-        return out
+        return out * sf
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
@@ -214,7 +214,7 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        return out
+        return out * self.sf
         
     def get_weights(self):
         weights_dict = {}
@@ -251,7 +251,7 @@ class dense_block(layer):
         self.train_flag = train
 
         if self.train_flag:
-            self.total = 0
+            self.total = 0.
             self.qsum = 0.
             if weights:
                 w = weights[self.weight_id]['w']
@@ -284,7 +284,7 @@ class dense_block(layer):
         qx = tf.reshape(qx, (-1, self.isize))
 
         qw, sw = quantize(self.w, -128, 127)
-        qb = self.b / sw # / sx 
+        qb = self.b / sw / sx
         # sx should be used here since no batch norm
 
         fc = tf.matmul(qx, qw) + qb
@@ -391,15 +391,24 @@ class res_block1(layer):
         return y3
 
     def collect(self, x):
-        return self.train(x)
+        y1 = self.conv1.collect(x)
+        y2 = self.conv2.collect(y1)
+        y3 = tf.nn.relu(x + y2)
+        return y3
 
     def predict(self, x):
-        return self.train(x)
+        y1 = self.conv1.predict(x)
+        y2 = self.conv2.predict(y1)
+        y3 = tf.nn.relu(x + y2)
+        return y3
 
     def get_weights(self):
         weights_dict = {}
         weights1 = self.conv1.get_weights()
         weights2 = self.conv2.get_weights()
+
+        weights_dict.update(weights1)
+        weights_dict.update(weights2)
         return weights_dict
         
     def get_params(self):
@@ -434,10 +443,18 @@ class res_block2(layer):
         return y4
 
     def collect(self, x):
-        return self.train(x)
+        y1 = self.conv1.collect(x)
+        y2 = self.conv2.collect(y1)
+        y3 = self.conv3.collect(x)
+        y4 = tf.nn.relu(y2 + y3)
+        return y4
 
     def predict(self, x):
-        return self.train(x)
+        y1 = self.conv1.predict(x)
+        y2 = self.conv2.predict(y1)
+        y3 = self.conv3.predict(x)
+        y4 = tf.nn.relu(y2 + y3)
+        return y4
 
     def get_weights(self):
         weights_dict = {}
