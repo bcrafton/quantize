@@ -161,7 +161,6 @@ class conv_block(layer):
 
     def train(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        x_pad, _ = quantize_and_dequantize(x_pad, -128, 127)
 
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
@@ -170,7 +169,8 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
-        qf, sf = quantize_and_dequantize(fold_f, -128, 127)
+        x_pad, _ = quantize_and_dequantize(x_pad, -128, 127)
+        qf, _ = quantize_and_dequantize(fold_f, -128, 127)
         qb = fold_b
 
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
@@ -181,7 +181,6 @@ class conv_block(layer):
     
     def collect(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        x_pad, sx = quantize(x_pad, -128, 127)
 
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
@@ -190,9 +189,9 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
+        x_pad, sx = quantize(x_pad, -128, 127)
         qf, sf = quantize(fold_f, -128, 127)
-        qb = fold_b / sf # / sx
-        # sx not used here since batch norm
+        qb = fold_b / sf / sx
 
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -203,7 +202,7 @@ class conv_block(layer):
         self.total += 1
         self.qsum += sx.numpy()
 
-        return out * sf
+        return out * sf * sx
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
@@ -214,7 +213,7 @@ class conv_block(layer):
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        return out * self.sf
+        return out * self.sf * self.q
         
     def get_weights(self):
         weights_dict = {}
@@ -227,7 +226,7 @@ class conv_block(layer):
         qf, sf = quantize(fold_f, -128, 127)
 
         fold_b = self.b - ((self.g * mean) / std)
-        qb = fold_b / sf
+        qb = fold_b / sf / q
 
         weights_dict[self.layer_id] = {'f': qf.numpy(), 'b': qb.numpy(), 'q': q, 'sf': sf}
         return weights_dict
@@ -285,7 +284,6 @@ class dense_block(layer):
 
         qw, sw = quantize(self.w, -128, 127)
         qb = self.b / sw / sx
-        # sx should be used here since no batch norm
 
         fc = tf.matmul(qx, qw) + qb
 
@@ -302,9 +300,9 @@ class dense_block(layer):
         
     def get_weights(self):
         weights_dict = {}
-        qw, sw = quantize(self.w, -128, 127)
-        qb = self.b / sw
         q = self.qsum / self.total
+        qw, sw = quantize(self.w, -128, 127)
+        qb = self.b / sw / q
         weights_dict[self.layer_id] = {'w': qw.numpy(), 'b': qb.numpy(), 'q': q}
         return weights_dict
         
