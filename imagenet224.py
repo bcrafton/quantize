@@ -14,7 +14,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[1]
+gpu = gpus[0]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -36,6 +36,7 @@ if train_flag:
     weights = np.load('resnet18.npy', allow_pickle=True).item()
 else:
     weights = np.load('trained_weights.npy', allow_pickle=True).item()
+    # weights = np.load('trained_weights_variance.npy', allow_pickle=True).item()
 
 ####################################
 

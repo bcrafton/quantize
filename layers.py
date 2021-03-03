@@ -173,7 +173,13 @@ class conv_block(layer):
         qf, _ = quantize_and_dequantize(fold_f, -128, 127)
         qb = fold_b
 
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID') + qb
+        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID')
+
+        # _, scale = quantize(conv, -128, 127)
+        # noise = tf.random.normal(shape=tf.shape(conv), mean=0., stddev=2.0*scale)
+        # conv = conv + noise
+
+        conv = conv + qb
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
@@ -208,8 +214,13 @@ class conv_block(layer):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
         x_pad = quantize_scale(x_pad, self.q, -128, 127)
 
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
+        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
 
+        # _, scale = quantize(conv, -128, 127)
+        # noise = tf.random.normal(shape=tf.shape(conv), mean=0., stddev=2.0*scale)
+        # conv = conv + noise
+
+        conv = conv + self.b
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 

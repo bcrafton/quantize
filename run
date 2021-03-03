@@ -1,0 +1,1 @@
+nohup python imagenet224.py & 
