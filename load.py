@@ -56,8 +56,9 @@ def preprocess(filename):
     # image = image / 255
     # image = (image - mean) / std
     
-    image = image // 2
-    
+    # image = image // 2
+    # print (np.max(image))
+
     return image
 
 #########################################

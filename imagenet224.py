@@ -14,7 +14,7 @@ for device in gpu_devices:
 '''
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-gpu = gpus[3]
+gpu = gpus[1]
 tf.config.experimental.set_visible_devices(gpu, 'GPU')
 tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -29,7 +29,7 @@ def quantize_np(x, low, high):
 
 ####################################
 
-train_flag = False
+train_flag = True
 num_example = 100000
 
 if train_flag:
