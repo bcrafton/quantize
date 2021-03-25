@@ -169,7 +169,7 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
-        x_pad, _ = quantize_and_dequantize(x_pad, -128, 127)
+        x_pad, _ = quantize_and_dequantize(x_pad, 0, 255)
         qf, _ = quantize_and_dequantize(fold_f, -128, 127)
         qb = fold_b
 
@@ -189,7 +189,7 @@ class conv_block(layer):
         fold_f = (self.g * self.f) / std
         fold_b = self.b - ((self.g * mean) / std)
 
-        x_pad, sx = quantize(x_pad, -128, 127)
+        x_pad, sx = quantize(x_pad, 0, 255)
         qf, sf = quantize(fold_f, -128, 127)
         qb = fold_b / sf / sx
 
@@ -206,7 +206,7 @@ class conv_block(layer):
 
     def predict(self, x):
         x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        x_pad = quantize_scale(x_pad, self.q, -128, 127)
+        x_pad = quantize_scale(x_pad, self.q, 0, 255)
 
         conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID') + self.b
 
