@@ -23,31 +23,20 @@ def quantize_np(x, low, high):
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
 assert(np.shape(x_train) == (50000, 32, 32, 3))
-x_train = quantize_np(x_train, 0, 127)
+x_train = quantize_np(x_train, 0, 255)
 
 assert(np.shape(x_test) == (10000, 32, 32, 3))
-x_test = quantize_np(x_test, 0, 127)
+x_test = quantize_np(x_test, 0, 255)
 
 ####################################
 
 model = model(layers=[
-conv_block((3,3, 3,64), 1),
-conv_block((3,3,64,64), 1),
-avg_pool(2, 2),
-
-conv_block((3,3, 64,  128), 1),
-conv_block((3,3, 128, 128), 1),
-avg_pool(2, 2),
-
-conv_block((3,3,128,256), 1),
-conv_block((3,3,256,256), 1),
-avg_pool(2, 2),
-
-conv_block((3,3,256,256), 1),
-conv_block((3,3,256,256), 1),
-avg_pool(4, 4),
-
-dense_block(256, 10)
+conv_block((3,3, 3,32), 1),
+conv_block((3,3,32,32), 2),
+conv_block((3,3,32,32), 1),
+conv_block((3,3,32,32), 1),
+conv_block((3,3,32,32), 2),
+dense_block(32*4*4, 10)
 ])
 
 params = model.get_params()

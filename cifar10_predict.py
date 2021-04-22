@@ -34,37 +34,13 @@ x_test = quantize_np(x_test, 0, 127)
 
 ####################################
 
-'''
 model = model(layers=[
-conv_block((3,3,3,64), 1, weights=weights, train=False),
-res_block1( 64,  64, 1, weights=weights, train=False),
-res_block2( 64, 128, 2, weights=weights, train=False),
-res_block2(128, 256, 2, weights=weights, train=False),
-res_block1(256, 256, 1, weights=weights, train=False),
-avg_pool(2, 2),
-avg_pool(4, 4),
-dense_block(256, 10, weights=weights, train=False)
-])
-'''
-
-model = model(layers=[
-conv_block((3,3, 3,64), 1, weights=weights, train=False),
-conv_block((3,3,64,64), 1, weights=weights, train=False),
-avg_pool(2, 2),
-
-conv_block((3,3, 64,  128), 1, weights=weights, train=False),
-conv_block((3,3, 128, 128), 1, weights=weights, train=False),
-avg_pool(2, 2),
-
-conv_block((3,3,128,256), 1, weights=weights, train=False),
-conv_block((3,3,256,256), 1, weights=weights, train=False),
-avg_pool(2, 2),
-
-conv_block((3,3,256,256), 1, weights=weights, train=False),
-conv_block((3,3,256,256), 1, weights=weights, train=False),
-avg_pool(4, 4),
-
-dense_block(256, 10, weights=weights, train=False)
+conv_block((3,3, 3,32), 1, weights=weights, train=False),
+conv_block((3,3,32,32), 2, weights=weights, train=False),
+conv_block((3,3,32,32), 1, weights=weights, train=False),
+conv_block((3,3,32,32), 1, weights=weights, train=False),
+conv_block((3,3,32,32), 2, weights=weights, train=False),
+dense_block(32*4*4, 10, weights=weights, train=False)
 ])
 
 ####################################
