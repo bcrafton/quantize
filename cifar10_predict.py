@@ -48,10 +48,10 @@ dense_block(32*4*4, 10, weights=weights, train=False)
 ####################################
 
 def predict(model, x, y):
-    pred_logits = model.predict(x)
+    pred_logits, all_ys = model.predict(x)
     pred_label = tf.argmax(pred_logits, axis=1)
     correct = tf.reduce_sum(tf.cast(tf.equal(pred_label, y), tf.float32))
-    return correct
+    return correct, all_ys
 
 ####################################
 
@@ -61,8 +61,16 @@ for batch in range(0, len(x_test), batch_size):
     xs = x_test[batch:batch+batch_size].astype(np.float32)
     ys = y_test[batch:batch+batch_size].reshape(-1).astype(np.int64)
 
-    correct = predict(model, xs, ys)
+    correct, all_ys = predict(model, xs, ys)
     total_correct += correct
+
+    if (batch == 0):
+        np.savetxt("y1_ref", X=all_ys[0][2].transpose(2,0,1).flatten(), fmt="%d")
+        np.savetxt("y2_ref", X=all_ys[1][2].transpose(2,0,1).flatten(), fmt="%d")
+        np.savetxt("y3_ref", X=all_ys[2][2].transpose(2,0,1).flatten(), fmt="%d")
+        np.savetxt("y4_ref", X=all_ys[3][2].transpose(2,0,1).flatten(), fmt="%d")
+        np.savetxt("y5_ref", X=all_ys[4][2].transpose(2,0,1).flatten(), fmt="%d")
+        np.savetxt("y6_ref", X=all_ys[5][2].flatten(), fmt="%d")
 
 print (total_correct / len(x_test) * 100)
 

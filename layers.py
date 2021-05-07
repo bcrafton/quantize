@@ -74,11 +74,13 @@ class model:
 
     def predict(self, x):
         y = x
+        ys = []
         for layer in self.layers:
             y = layer.predict(y)
+            ys.append(y.numpy())
             assert (np.max(y) <   128)
             assert (np.min(y) >= -128)
-        return y
+        return y, ys
         
     def get_weights(self):
         weights_dict = {}
@@ -158,6 +160,8 @@ class conv_block(layer):
             q = weights[self.layer_id]['q']
             self.f = tf.Variable(f, dtype=tf.float32, trainable=False)
             self.q = q
+            self.qshift = self.q // 255
+            self.qdiv = self.q >> self.qshift
 
     def train(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
@@ -204,17 +208,16 @@ class conv_block(layer):
 
     def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
-
-        if self.relu_flag: out = tf.nn.relu(conv)
-        else:              out = conv
-
-        if self.quantize_flag:
-            qout = quantize_scale(out, self.q, -128, 127)
-            scale = self.q
-        else:
-            qout = out
-            scale = tf.constant(1.)
-
+        out = tf.nn.relu(conv)
+        # qout = quantize_scale(out, self.q, -128, 127)
+        # tf.print (self.q, self.qdiv * 2 ** self.qshift)
+        qout = out
+        qout = qout / (2 ** self.qshift)
+        qout = tf.cast(qout, dtype=tf.int32)
+        qout = qout / self.qdiv
+        qout = tf.cast(qout, dtype=tf.int32)
+        qout = tf.clip_by_value(qout, -128, 127)
+        qout = tf.cast(qout, dtype=tf.float32)
         return qout
         
     def get_weights(self):
@@ -265,6 +268,8 @@ class dense_block(layer):
             q = weights[self.layer_id]['q']
             self.w = tf.Variable(w, dtype=tf.float32, trainable=False)
             self.q = q
+            self.qshift = self.q // 255
+            self.qdiv = self.q >> self.qshift
 
     def train(self, x):
         qw, sw = quantize_and_dequantize(self.w, self.LOW, self.HIGH)
@@ -292,7 +297,15 @@ class dense_block(layer):
         x = tf.transpose(x, (0,3,1,2))
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w)
-        qfc = quantize_scale(fc, self.q, -128, 127)
+        # qfc = quantize_scale(fc, self.q, -128, 127)
+        # tf.print(self.q, 2 ** self.qshift * self.qdiv)
+        qfc = fc
+        qfc = qfc / (2 ** self.qshift)
+        qfc = tf.cast(qfc, dtype=tf.int32)
+        qfc = qfc / self.qdiv
+        qfc = tf.cast(qfc, dtype=tf.int32)
+        qfc = tf.clip_by_value(qfc, -128, 127)
+        qfc = tf.cast(qfc, dtype=tf.float32)
         return qfc
         
     def get_weights(self):
