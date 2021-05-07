@@ -27,10 +27,12 @@ weights = np.load('cifar10_weights.npy', allow_pickle=True).item()
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
 assert(np.shape(x_train) == (50000, 32, 32, 3))
-x_train = quantize_np(x_train, 0, 127)
+# x_train = quantize_np(x_train, -128, 127)
+x_train = x_train // 2
 
 assert(np.shape(x_test) == (10000, 32, 32, 3))
-x_test = quantize_np(x_test, 0, 127)
+# x_test = quantize_np(x_test, -128, 127)
+x_test = x_test // 2
 
 ####################################
 
