@@ -30,13 +30,14 @@ x_test = quantize_np(x_test, 0, 255)
 
 ####################################
 
+bits = 7
 model = model(layers=[
-conv_block((3,3, 3,32), 1, bits=8),
-conv_block((3,3,32,32), 2, bits=8),
-conv_block((3,3,32,32), 1, bits=8),
-conv_block((3,3,32,32), 1, bits=8),
-conv_block((3,3,32,32), 2, bits=8),
-dense_block(32*4*4, 10, bits=8)
+conv_block((3,3, 3,32), 1, bits=bits),
+conv_block((3,3,32,32), 2, bits=bits),
+conv_block((3,3,32,32), 1, bits=bits),
+conv_block((3,3,32,32), 1, bits=bits),
+conv_block((3,3,32,32), 2, bits=bits),
+dense_block(32*4*4, 10, bits=bits)
 ])
 
 params = model.get_params()
