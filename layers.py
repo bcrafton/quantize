@@ -68,16 +68,14 @@ class model:
     
     def collect(self, x):
         y = x
-        s = tf.constant(1.)
         for layer in self.layers:
-            y, s = layer.collect(y, s)
+            y = layer.collect(y)
         return y
 
     def predict(self, x):
         y = x
-        s = tf.constant(1.)
         for layer in self.layers:
-            y, s = layer.predict(y, s)
+            y = layer.predict(y)
             assert (np.max(y) <   128)
             assert (np.min(y) >= -128)
         return y
@@ -110,10 +108,10 @@ class layer:
     def train(self, x):        
         assert(False)
     
-    def collect(self, x, s):
+    def collect(self, x):
         assert(False)
 
-    def predict(self, x, s):
+    def predict(self, x):
         assert(False)
         
     def get_weights(self):
@@ -178,7 +176,7 @@ class conv_block(layer):
 
         return qout
     
-    def collect(self, x, s):
+    def collect(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
@@ -202,9 +200,9 @@ class conv_block(layer):
             qout = out
             scale = sf
 
-        return qout, scale
+        return qout
 
-    def predict(self, x, s):
+    def predict(self, x):
         conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
 
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -217,7 +215,7 @@ class conv_block(layer):
             qout = out
             scale = tf.constant(1.)
 
-        return qout, scale
+        return qout
         
     def get_weights(self):
         weights_dict = {}
@@ -277,7 +275,7 @@ class dense_block(layer):
         qfc, _ = quantize_and_dequantize(fc, -128, 127)
         return qfc
     
-    def collect(self, x, s):
+    def collect(self, x):
         qw, sw = quantize(self.w, self.LOW, self.HIGH)
         
         x = tf.transpose(x, (0,3,1,2))
@@ -288,14 +286,14 @@ class dense_block(layer):
         self.q_sum += sfc.numpy()
         self.total += 1
 
-        return qfc, sfc
+        return qfc
 
-    def predict(self, x, s):
+    def predict(self, x):
         x = tf.transpose(x, (0,3,1,2))
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w)
         qfc = quantize_scale(fc, self.q, -128, 127)
-        return qfc, self.q
+        return qfc
         
     def get_weights(self):
         weights_dict = {}
@@ -309,69 +307,6 @@ class dense_block(layer):
         return [self.w]
 
 #############
-
-class avg_pool(layer):
-    def __init__(self, s, p, weights=None):
-        assert (False)
-        self.layer_id = layer.layer_id
-        layer.layer_id += 1
-    
-        self.s = s
-        self.p = p
-        
-    def train(self, x):        
-        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return pool
-    
-    def collect(self, x, s):
-        pool = tf.nn.avg_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool, spool = quantize(pool, -128, 127)
-        return pool, s
-
-    def predict(self, x, s):
-        return self.collect(x, s)
-        
-    def get_weights(self):    
-        weights_dict = {}
-        weights_dict[self.layer_id] = {}
-        return weights_dict
-        
-    def get_params(self):
-        return []
-
-#############
-
-class max_pool(layer):
-    def __init__(self, s, p, weights=None):
-        assert (False)
-        self.layer_id = layer.layer_id
-        layer.layer_id += 1
-    
-        self.s = s
-        self.p = p
-        
-    def train(self, x):        
-        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        return pool
-    
-    def collect(self, x, s):
-        pool = tf.nn.max_pool(x, ksize=self.p, strides=self.s, padding="SAME")
-        qpool, spool = quantize(pool, -128, 127)
-        return pool, s
-
-    def predict(self, x, s):
-        return self.collect(x, s)
-        
-    def get_weights(self):    
-        weights_dict = {}
-        weights_dict[self.layer_id] = {}
-        return weights_dict
-
-    def get_params(self):
-        return []
-
-#############
-
 
 
         
