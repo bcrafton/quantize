@@ -130,7 +130,6 @@ class conv_block(layer):
         layer.weight_id += 1
 
         self.k, _, self.f1, self.f2 = shape
-        self.pad = 0 # self.k // 2
         self.p = p
 
         self.relu_flag = relu
@@ -152,8 +151,10 @@ class conv_block(layer):
                 self.f = tf.Variable(f, dtype=tf.float32)
                 self.g = tf.Variable(g, dtype=tf.float32)
             else:
-                self.f = tf.Variable(init_filters(size=[self.k,self.k,self.f1,self.f2], init='glorot_uniform'), dtype=tf.float32, name='f_%d' % (self.layer_id))
-                self.g = tf.Variable(np.ones(shape=(self.f2)), dtype=tf.float32, name='g_%d' % (self.layer_id))
+                f = init_filters(size=[self.k,self.k,self.f1,self.f2], init='glorot_uniform')
+                g = np.ones(shape=(self.f2))
+                self.f = tf.Variable(f, dtype=tf.float32, name='f_%d' % (self.layer_id))
+                self.g = tf.Variable(g, dtype=tf.float32, name='g_%d' % (self.layer_id))
         else:
             f = weights[self.layer_id]['f']
             q = weights[self.layer_id]['q']
@@ -161,15 +162,14 @@ class conv_block(layer):
             self.q = q
 
     def train(self, x):
-        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
         qf, sf = quantize_and_dequantize(fold_f, self.LOW, self.HIGH)
 
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID')
+        conv = tf.nn.conv2d(x, qf, [1,self.p,self.p,1], 'VALID')
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
@@ -179,15 +179,14 @@ class conv_block(layer):
         return qout
     
     def collect(self, x, s):
-        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
         mean = tf.reduce_mean(conv, axis=[0,1,2])
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
         qf, sf = quantize(fold_f, self.LOW, self.HIGH)
         
-        conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID')
+        conv = tf.nn.conv2d(x, qf, [1,self.p,self.p,1], 'VALID')
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
@@ -206,8 +205,7 @@ class conv_block(layer):
         return qout, scale
 
     def predict(self, x, s):
-        x_pad = tf.pad(x, [[0, 0], [self.pad, self.pad], [self.pad, self.pad], [0, 0]])
-        conv = tf.nn.conv2d(x_pad, self.f, [1,self.p,self.p,1], 'VALID')
+        conv = tf.nn.conv2d(x, self.f, [1,self.p,self.p,1], 'VALID')
 
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
