@@ -78,6 +78,8 @@ class model:
         s = tf.constant(1.)
         for layer in self.layers:
             y, s = layer.predict(y, s)
+            assert (np.max(y) <   128)
+            assert (np.min(y) >= -128)
         return y
         
     def get_weights(self):
@@ -120,7 +122,7 @@ class layer:
 #############
         
 class conv_block(layer):
-    def __init__(self, shape, p, weights=None, relu=True, train=True, quantize=True):
+    def __init__(self, shape, p, weights=None, relu=True, train=True, quantize=True, bits=8):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
@@ -134,6 +136,10 @@ class conv_block(layer):
         self.relu_flag = relu
         self.train_flag = train
         self.quantize_flag = quantize
+
+        self.bits = bits
+        self.HIGH = 2 ** (self.bits - 1) - 1
+        self.LOW  = -2 ** (self.bits - 1)
 
         if self.train_flag:
             self.total = 0
@@ -161,13 +167,13 @@ class conv_block(layer):
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
-        qf, sf = quantize_and_dequantize(fold_f, -128, 127)
+        qf, sf = quantize_and_dequantize(fold_f, self.LOW, self.HIGH)
 
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID')
         if self.relu_flag: out = tf.nn.relu(conv)
         else:              out = conv
 
-        if self.quantize_flag: qout, _ = quantize_and_dequantize(out, 0, 255)
+        if self.quantize_flag: qout, _ = quantize_and_dequantize(out, -128, 127)
         else:                  qout = out
 
         return qout
@@ -179,7 +185,7 @@ class conv_block(layer):
         _, var = tf.nn.moments(conv - mean, axes=[0,1,2])
         std = tf.sqrt(var + 1e-3)
         fold_f = (self.g * self.f) / std
-        qf, sf = quantize(fold_f, -128, 127)
+        qf, sf = quantize(fold_f, self.LOW, self.HIGH)
         
         conv = tf.nn.conv2d(x_pad, qf, [1,self.p,self.p,1], 'VALID')
         if self.relu_flag: out = tf.nn.relu(conv)
@@ -190,7 +196,7 @@ class conv_block(layer):
         self.total += 1
 
         if self.quantize_flag:
-            qout, sout = quantize(out, 0, 255)
+            qout, sout = quantize(out, -128, 127)
             self.q_sum += sout.numpy()
             scale = sout * sf
         else:
@@ -207,7 +213,7 @@ class conv_block(layer):
         else:              out = conv
 
         if self.quantize_flag:
-            qout = quantize_scale(out, self.q, 0, 255)
+            qout = quantize_scale(out, self.q, -128, 127)
             scale = self.q
         else:
             qout = out
@@ -223,7 +229,7 @@ class conv_block(layer):
         q = self.q_sum / self.total
 
         fold_f = (self.g * self.f) / std
-        qf, sf = quantize(fold_f, -128, 127)
+        qf, sf = quantize(fold_f, self.LOW, self.HIGH)
 
         print (self.layer_id, q)
         weights_dict[self.layer_id] = {'f': qf.numpy().astype(int), 'q': int(q)}
@@ -235,7 +241,7 @@ class conv_block(layer):
 #############
 
 class dense_block(layer):
-    def __init__(self, isize, osize, weights=None, train=True):
+    def __init__(self, isize, osize, weights=None, train=True, bits=8):
         self.layer_id = layer.layer_id
         layer.layer_id += 1
 
@@ -246,6 +252,9 @@ class dense_block(layer):
         self.osize = osize
 
         self.train_flag = train
+        self.bits = bits
+        self.HIGH = 2 ** (self.bits - 1) - 1
+        self.LOW  = -2 ** (self.bits - 1)
 
         if self.train_flag:
             self.total = 0
@@ -262,7 +271,7 @@ class dense_block(layer):
             self.q = q
 
     def train(self, x):
-        qw, sw = quantize_and_dequantize(self.w, -128, 127)
+        qw, sw = quantize_and_dequantize(self.w, self.LOW, self.HIGH)
 
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw)
@@ -270,7 +279,7 @@ class dense_block(layer):
         return qfc
     
     def collect(self, x, s):
-        qw, sw = quantize(self.w, -128, 127)
+        qw, sw = quantize(self.w, self.LOW, self.HIGH)
         
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw)
@@ -289,7 +298,7 @@ class dense_block(layer):
         
     def get_weights(self):
         weights_dict = {}
-        qw, sw = quantize(self.w, -128, 127)
+        qw, sw = quantize(self.w, self.LOW, self.HIGH)
         q = self.q_sum / self.total
         print (self.layer_id, q)
         weights_dict[self.layer_id] = {'w': qw.numpy().astype(int), 'q': int(q)}
@@ -359,147 +368,6 @@ class max_pool(layer):
 
     def get_params(self):
         return []
-
-#############
-
-class res_block1(layer):
-    def __init__(self, f1, f2, p, weights=None, train=True):
-        assert (False)
-        
-        self.f1 = f1
-        self.f2 = f2
-        self.p = p
-
-        self.train_flag = train
-
-        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights, relu=True,  train=train)
-        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train)
-
-        self.layer_id = layer.layer_id
-        layer.layer_id += 1
-
-        self.total = 0
-        self.q_sum = 0.
-
-        if not train:
-            self.q = weights[self.layer_id]['q']
-
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
-        y3 = tf.nn.relu(x + y2)
-        qout, _ = quantize_and_dequantize(y3, -128, 127)
-        return qout
-
-    def collect(self, x, s):
-        y1, s1 = self.conv1.collect(x, s)
-        y2, s2 = self.conv2.collect(y1, s1)
-        y3 = tf.nn.relu(s*x + s2*y2)
-        out, sout = quantize(y3, -128, 127)
-
-        self.q_sum += sout.numpy()
-        self.total += 1
-
-        return out, sout
-
-    def predict(self, x, s):
-        y1, s1 = self.conv1.predict(x, s)
-        y2, s2 = self.conv2.predict(y1, s1)
-        y3 = tf.nn.relu(s*x + s2*y2)
-        out = quantize_scale(y3, self.q, -128, 127)
-        return out, self.q
-
-    def get_weights(self):
-        weights_dict = {}
-        weights1 = self.conv1.get_weights()
-        weights2 = self.conv2.get_weights()
-        
-        weights_dict.update(weights1)
-        weights_dict.update(weights2)
-
-        q = self.q_sum / self.total
-        weights_dict[self.layer_id] = {'q': q}
-        return weights_dict
-        
-    def get_params(self):
-        params = []
-        params.extend(self.conv1.get_params())
-        params.extend(self.conv2.get_params())
-        return params
-
-#############
-
-class res_block2(layer):
-    def __init__(self, f1, f2, p, weights=None, train=True):
-        assert (False)
-
-        self.f1 = f1
-        self.f2 = f2
-        self.p = p
-
-        self.train_flag = train
-
-        self.conv1 = conv_block((3, 3, f1, f2), p, weights=weights, relu=True,  train=train)
-        self.conv2 = conv_block((3, 3, f2, f2), 1, weights=weights, relu=False, train=train, quantize=False)
-        self.conv3 = conv_block((1, 1, f1, f2), p, weights=weights, relu=False, train=train, quantize=False)
-        
-        self.layer_id = layer.layer_id
-        layer.layer_id += 1
-
-        self.total = 0
-        self.q_sum = 0.
-
-        if not train:
-            self.q = weights[self.layer_id]['q']
-
-    def train(self, x):
-        y1 = self.conv1.train(x)
-        y2 = self.conv2.train(y1)
-        y3 = self.conv3.train(x)
-        y4 = tf.nn.relu(y2 + y3)
-        out, _ = quantize_and_dequantize(y4, -128, 127)
-        return out
-
-    def collect(self, x, s):
-        y1, s1 = self.conv1.collect(x, s)
-        y2, s2 = self.conv2.collect(y1, s1)
-        y3, s3 = self.conv3.collect(x, s)
-        y4 = tf.nn.relu(s2*y2 + s3*y3)
-        out, sout = quantize(y4, -128, 127)
-
-        self.q_sum += sout.numpy()
-        self.total += 1
-
-        return out, sout
-
-    def predict(self, x, s):
-        y1, s1 = self.conv1.predict(x, s)
-        y2, s2 = self.conv2.predict(y1, s1)
-        y3, s3 = self.conv3.predict(x, s)
-        y4 = tf.nn.relu(s2*y2 + s3*y3)
-        out = quantize_scale(y4, self.q, -128, 127)
-        return out, self.q
-
-    def get_weights(self):
-        weights_dict = {}
-        weights1 = self.conv1.get_weights()
-        weights2 = self.conv2.get_weights()
-        weights3 = self.conv3.get_weights()
-       
-        weights_dict.update(weights1)
-        weights_dict.update(weights2)
-        weights_dict.update(weights3)
-
-        q  = self.q_sum / self.total
-        weights_dict[self.layer_id] = {'q': q}
-        return weights_dict
-
-    def get_params(self):
-        params = []
-        params.extend(self.conv1.get_params())
-        params.extend(self.conv2.get_params())
-        params.extend(self.conv3.get_params())
-        return params
 
 #############
 
