@@ -271,6 +271,7 @@ class dense_block(layer):
     def train(self, x):
         qw, sw = quantize_and_dequantize(self.w, self.LOW, self.HIGH)
 
+        x = tf.transpose(x, (0,3,1,2))
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw)
         qfc, _ = quantize_and_dequantize(fc, -128, 127)
@@ -279,6 +280,7 @@ class dense_block(layer):
     def collect(self, x, s):
         qw, sw = quantize(self.w, self.LOW, self.HIGH)
         
+        x = tf.transpose(x, (0,3,1,2))
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, qw)
         qfc, sfc = quantize(fc, -128, 127)
@@ -289,6 +291,7 @@ class dense_block(layer):
         return qfc, sfc
 
     def predict(self, x, s):
+        x = tf.transpose(x, (0,3,1,2))
         x = tf.reshape(x, (-1, self.isize))
         fc = tf.matmul(x, self.w)
         qfc = quantize_scale(fc, self.q, -128, 127)

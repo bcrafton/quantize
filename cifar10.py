@@ -23,14 +23,14 @@ def quantize_np(x, low, high):
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
 assert(np.shape(x_train) == (50000, 32, 32, 3))
-x_train = quantize_np(x_train, 0, 255)
+x_train = quantize_np(x_train, -128, 127)
 
 assert(np.shape(x_test) == (10000, 32, 32, 3))
-x_test = quantize_np(x_test, 0, 255)
+x_test = quantize_np(x_test, -128, 127)
 
 ####################################
 
-bits = 7
+bits = 8
 model = model(layers=[
 conv_block((3,3, 3,32), 1, bits=bits),
 conv_block((3,3,32,32), 2, bits=bits),
